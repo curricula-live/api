@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app import APP_VERSION
 
 
 @pytest.fixture
@@ -16,7 +17,7 @@ def test_root_endpoint_returns_service_info(client):
     assert response.json() == {
         "status": "online",
         "service": "curricula.live api",
-        "version": "0.1.0",
+        "version": APP_VERSION,
     }
 
 
