@@ -1,10 +1,11 @@
 from fastapi import FastAPI
 
+from app import APP_VERSION
 from app.routes.health import router as health_router
 
 app = FastAPI(
     title="curricula.live API",
-    version="0.1.0",
+    version=APP_VERSION,
 )
 
 app.include_router(health_router)

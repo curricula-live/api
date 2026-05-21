@@ -1,5 +1,7 @@
 from fastapi import APIRouter
 
+from app import APP_VERSION
+
 router = APIRouter()
 
 
@@ -8,7 +10,7 @@ def root():
     return {
         "status": "online",
         "service": "curricula.live api",
-        "version": "0.1.0",
+        "version": APP_VERSION,
     }
 
 
