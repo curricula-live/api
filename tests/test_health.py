@@ -1,11 +1,15 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 
-client = TestClient(app)
+
+@pytest.fixture
+def client():
+    return TestClient(app)
 
 
-def test_root_endpoint_returns_service_info():
+def test_root_endpoint_returns_service_info(client):
     response = client.get("/")
 
     assert response.status_code == 200
@@ -16,7 +20,7 @@ def test_root_endpoint_returns_service_info():
     }
 
 
-def test_health_endpoint_returns_ok_status():
+def test_health_endpoint_returns_ok_status(client):
     response = client.get("/health")
 
     assert response.status_code == 200
