@@ -1,0 +1,17 @@
+{% extends "admin/base_site.html" %}
+{% block extrastyle %}{{ block.super }}<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>{% endblock %}
+{% block content %}
+<h1>Knowledge graph</h1>
+<p>Use this view for exploration. Use the Concepts and Relations tables for precise editing.</p>
+<div id="graph" style="height:72vh;border:1px solid var(--border-color);background:var(--body-bg)"></div>
+<script>
+const nodes = new vis.DataSet({{ nodes|safe }});
+const edges = new vis.DataSet({{ edges|safe }});
+new vis.Network(document.getElementById('graph'), {nodes, edges}, {
+  interaction: {hover: true, navigationButtons: true},
+  physics: {stabilization: {iterations: 250}},
+  edges: {smooth: {type: 'dynamic'}},
+  nodes: {shape: 'dot', size: 16}
+});
+</script>
+{% endblock %}
