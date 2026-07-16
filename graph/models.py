@@ -3,13 +3,6 @@ import uuid
 from django.core.exceptions import ValidationError
 from django.db import models
 
-RELATION_TYPES = [
-    "prerequisite_of", "part_of", "type_of", "instance_of", "uses", "used_by",
-    "depends_on", "equivalent_to", "overlaps_with", "assessed_by", "introduces",
-    "input_for", "output_of", "stored_in", "processed_by", "communicates_with",
-    "controls", "represented_by", "related_to",
-]
-
 
 class Concept(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -42,7 +35,10 @@ class Relation(models.Model):
         related_name="incoming_relations",
         db_column="target",
     )
-    type = models.CharField(max_length=64, choices=[(value, value) for value in RELATION_TYPES])
+    type = models.SlugField(
+        max_length=64,
+        help_text="Extensible relation predicate, for example prerequisite_of or part_of.",
+    )
     metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
