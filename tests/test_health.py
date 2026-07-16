@@ -1,4 +1,5 @@
 import pytest
+from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
 from django.db import connection
 from django.urls import reverse
@@ -60,6 +61,51 @@ def test_anonymous_api_writes_are_rejected(client):
 
     assert response.status_code in {401, 403}
     assert not Concept.objects.filter(slug="tree").exists()
+
+
+@pytest.mark.django_db
+def test_authenticated_user_without_model_permission_cannot_write(
+    client,
+    django_user_model,
+):
+    user = django_user_model.objects.create_user(
+        username="reader",
+        password="unused",
+    )
+    client.force_login(user)
+
+    response = client.post(
+        "/api/concepts/",
+        {"slug": "tree", "label": "Tree", "metadata": {}},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 403
+    assert not Concept.objects.filter(slug="tree").exists()
+
+
+@pytest.mark.django_db
+def test_user_with_add_permission_can_create_concept(client, django_user_model):
+    user = django_user_model.objects.create_user(
+        username="editor",
+        password="unused",
+    )
+    user.user_permissions.add(Permission.objects.get(codename="add_concept"))
+    client.force_login(user)
+
+    response = client.post(
+        "/api/concepts/",
+        {
+            "slug": "tree",
+            "label": "Tree",
+            "description": "",
+            "metadata": {},
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 201
+    assert Concept.objects.filter(slug="tree").exists()
 
 
 @pytest.mark.django_db
