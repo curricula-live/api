@@ -1,0 +1,12 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>SQL workbench</h1>
+<p>Superuser-only bulk editing. Statements run with a 5-second timeout; result display is limited to 500 rows.</p>
+<form method="post">{% csrf_token %}
+<textarea name="sql" rows="14" style="width:100%;font-family:monospace">{{ sql }}</textarea>
+<p><label><input type="checkbox" name="allow_write"> Allow write statement</label></p>
+<input type="submit" value="Execute">
+</form>
+{% if error %}<p class="errornote">{{ error }}</p>{% endif %}
+{% if columns %}<div style="overflow:auto"><table><thead><tr>{% for c in columns %}<th>{{ c }}</th>{% endfor %}</tr></thead><tbody>{% for row in rows %}<tr>{% for value in row %}<td>{{ value }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>{% endif %}
+{% endblock %}
