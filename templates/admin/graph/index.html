@@ -1,0 +1,19 @@
+{% extends "admin/index.html" %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;margin-bottom:1.5rem">
+  <section class="module" style="padding:1rem">
+    <h2>Graph explorer</h2>
+    <p>Search concepts, filter relation types, and inspect bounded neighbourhoods.</p>
+    <p><a class="button" href="{% url 'graph_admin:graph-view' %}">Open graph explorer</a></p>
+  </section>
+  {% if user.is_superuser %}
+  <section class="module" style="padding:1rem">
+    <h2>SQL workbench</h2>
+    <p>Run bounded read-only queries or explicitly confirmed bulk changes.</p>
+    <p><a class="button" href="{% url 'graph_admin:sql-workbench' %}">Open SQL workbench</a></p>
+  </section>
+  {% endif %}
+</div>
+{{ block.super }}
+{% endblock %}
