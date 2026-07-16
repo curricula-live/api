@@ -1,12 +1,55 @@
 {% extends "admin/base_site.html" %}
+
 {% block content %}
 <h1>SQL workbench</h1>
-<p>Superuser-only bulk editing. Statements run with a 5-second timeout; result display is limited to 500 rows.</p>
+<p>
+  This page is restricted to superusers. Read-only execution is the default.
+  Statements have a 5-second timeout, a 1-second lock timeout, and at most 500 displayed rows.
+</p>
+
 <form method="post">{% csrf_token %}
-<textarea name="sql" rows="14" style="width:100%;font-family:monospace">{{ sql }}</textarea>
-<p><label><input type="checkbox" name="allow_write"> Allow write statement</label></p>
-<input type="submit" value="Execute">
+  <textarea name="sql" rows="14" style="width:100%;font-family:monospace" spellcheck="false">{{ sql }}</textarea>
+
+  <fieldset style="margin-top:1rem">
+    <legend>Write controls</legend>
+    <p>
+      <label>
+        <input type="checkbox" name="allow_write"{% if allow_write %} checked{% endif %}>
+        Enable write mode
+      </label>
+    </p>
+    <input type="hidden" name="dry_run" value="off">
+    <p>
+      <label>
+        <input type="checkbox" name="dry_run" value="on"{% if dry_run %} checked{% endif %}>
+        Dry run: roll back changes after execution
+      </label>
+    </p>
+    <p>
+      <label>
+        Confirmation for write mode<br>
+        <input type="text" name="confirmation" value="{{ confirmation }}" placeholder="Type APPLY">
+      </label>
+    </p>
+  </fieldset>
+
+  <p><input type="submit" value="Execute statement"></p>
 </form>
+
 {% if error %}<p class="errornote">{{ error }}</p>{% endif %}
-{% if columns %}<div style="overflow:auto"><table><thead><tr>{% for c in columns %}<th>{{ c }}</th>{% endfor %}</tr></thead><tbody>{% for row in rows %}<tr>{% for value in row %}<td>{{ value }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>{% endif %}
+{% if affected_rows is not None %}<p>Affected/result row count reported by PostgreSQL: {{ affected_rows }}.</p>{% endif %}
+{% if result_truncated %}<p class="warning">Only the first 500 result rows are displayed.</p>{% endif %}
+
+{% if columns %}
+<div style="overflow:auto">
+  <table>
+    <thead><tr>{% for column in columns %}<th>{{ column }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>{% for value in row %}<td>{{ value }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
 {% endblock %}
