@@ -1,17 +1,53 @@
 {% extends "admin/base_site.html" %}
-{% block extrastyle %}{{ block.super }}<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+{% endblock %}
+
 {% block content %}
 <h1>Knowledge graph</h1>
-<p>Use this view for exploration. Use the Concepts and Relations tables for precise editing.</p>
+<p>Use this view for exploration. Double-click a node to edit it, or use the Concepts and Relations tables for precise changes.</p>
+
+<form method="get" style="display:flex;gap:0.75rem;align-items:end;flex-wrap:wrap;margin-bottom:1rem">
+  <label>Search<br><input type="search" name="q" value="{{ filters.q }}" placeholder="slug, label or description"></label>
+  <label>Relation type<br>
+    <select name="type">
+      <option value="">All relation types</option>
+      {% for relation_type in relation_types %}
+      <option value="{{ relation_type }}"{% if filters.type == relation_type %} selected{% endif %}>{{ relation_type }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Node limit<br><input type="number" name="limit" min="1" max="1000" value="{{ filters.limit }}"></label>
+  <button type="submit">Apply filters</button>
+  <a href=".">Reset</a>
+</form>
+
+<p>
+  Showing <strong>{{ stats.shown_nodes }}</strong> of {{ stats.total_nodes }} concepts and
+  <strong>{{ stats.shown_edges }}</strong> of {{ stats.total_edges }} relations.
+  {% if stats.truncated %}The view is bounded; narrow the search to inspect a specific neighbourhood.{% endif %}
+</p>
+
 <div id="graph" style="height:72vh;border:1px solid var(--border-color);background:var(--body-bg)"></div>
+{{ nodes|json_script:"graph-nodes" }}
+{{ edges|json_script:"graph-edges" }}
 <script>
-const nodes = new vis.DataSet({{ nodes|safe }});
-const edges = new vis.DataSet({{ edges|safe }});
-new vis.Network(document.getElementById('graph'), {nodes, edges}, {
-  interaction: {hover: true, navigationButtons: true},
+const nodeRows = JSON.parse(document.getElementById("graph-nodes").textContent);
+const edgeRows = JSON.parse(document.getElementById("graph-edges").textContent);
+const nodes = new vis.DataSet(nodeRows);
+const edges = new vis.DataSet(edgeRows);
+const network = new vis.Network(document.getElementById("graph"), {nodes, edges}, {
+  interaction: {hover: true, navigationButtons: true, keyboard: true},
   physics: {stabilization: {iterations: 250}},
-  edges: {smooth: {type: 'dynamic'}},
-  nodes: {shape: 'dot', size: 16}
+  edges: {smooth: {type: "dynamic"}},
+  nodes: {shape: "dot", size: 16}
+});
+network.on("doubleClick", (event) => {
+  if (event.nodes.length === 1) {
+    window.location.href = `../graph/concept/${event.nodes[0]}/change/`;
+  }
 });
 </script>
 {% endblock %}
