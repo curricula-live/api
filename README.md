@@ -21,3 +21,11 @@ uvicorn app.main:app --reload
 ```bash
 pytest
 ```
+
+## Pull request previews
+
+The FastAPI entry point is configured for Vercel in `pyproject.toml`.
+
+After importing the `curricula-live/api` GitHub repository into Vercel, every pull request and non-production branch receives its own Preview Deployment URL. The `main` branch remains the production branch.
+
+GitHub Actions also runs the Python test suite for every pull request and every push to `main`.
