@@ -1,5 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "python manage.py collectstatic --noinput",
+  "buildCommand": "DJANGO_SECRET_KEY=vercel-build-only-not-a-runtime-secret python manage.py collectstatic --noinput",
   "framework": null
 }
