@@ -30,7 +30,7 @@ jobs:
       DB_SSL_REQUIRE: "false"
       DJANGO_SECRET_KEY: ci-only-secret-key-with-more-than-fifty-characters-123456789
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
-      DJANGO_DEBUG: "false"
+      DJANGO_DEBUG: "true"
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
