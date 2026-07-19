@@ -45,3 +45,27 @@ pytest
 ```
 
 The GitHub Actions workflow provisions PostgreSQL 17, applies migrations, checks for migration drift, and runs the test suite.
+
+## Deployment
+
+Vercel runs `config.wsgi:application` as a serverless Python function and
+collects static assets during the build. Do not use the deployment filesystem
+for persistent data or run migrations during function startup.
+
+Configure these separately for Preview and Production:
+
+- `DATABASE_URL` (required): PostgreSQL connection URL. Preview must use a
+  staging database or a database role that cannot modify production data.
+- `DJANGO_SECRET_KEY` (required): a distinct, random value per environment.
+- `DJANGO_DEBUG` (required): `false` outside local development.
+- `DJANGO_ALLOWED_HOSTS` (required): comma-separated deployment hostnames.
+- `DJANGO_CSRF_TRUSTED_ORIGINS` (required for admin/API browser writes):
+  comma-separated `https://` origins.
+- `DB_SSL_REQUIRE` (required for Supabase): `true`.
+
+Run migrations as an explicit, reviewed deployment operation. The current
+initial migration adopts and extends the graph tables, so it must not be run
+against production until its SQL has been compared with the real Supabase
+schema and tested on a staging clone. Create the first administrator with
+`python manage.py createsuperuser` from a trusted one-off environment connected
+to the intended database.

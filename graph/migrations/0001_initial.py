@@ -1,6 +1,7 @@
 import uuid
 
 import django.db.models.deletion
+import graph.models
 from django.db import migrations, models
 
 SCHEMA_SQL = """
@@ -30,8 +31,25 @@ alter table relation add column if not exists metadata jsonb not null default '{
 alter table relation add column if not exists created_at timestamptz not null default now();
 alter table relation add column if not exists updated_at timestamptz not null default now();
 
-create unique index if not exists unique_typed_relation
-    on relation(source, target, type);
+do $$
+begin
+    if not exists (
+        select 1 from pg_constraint
+        where conrelid = 'relation'::regclass
+          and conname = 'unique_typed_relation'
+    ) then
+        if exists (
+            select 1 from pg_class
+            where relkind = 'i' and relname = 'unique_typed_relation'
+        ) then
+            alter table relation add constraint unique_typed_relation
+                unique using index unique_typed_relation;
+        else
+            alter table relation add constraint unique_typed_relation
+                unique (source, target, type);
+        end if;
+    end if;
+end $$;
 create index if not exists relation_source_type_idx
     on relation(source, type);
 create index if not exists relation_target_type_idx
@@ -95,6 +113,7 @@ class Migration(migrations.Migration):
                                     "prerequisite_of or part_of."
                                 ),
                                 max_length=64,
+                                validators=[graph.models.validate_relation_type],
                             ),
                         ),
                         ("metadata", models.JSONField(blank=True, default=dict)),

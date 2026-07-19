@@ -1,7 +1,13 @@
 import uuid
+import re
 
 from django.core.exceptions import ValidationError
 from django.db import models
+
+
+def validate_relation_type(value):
+    if not re.fullmatch(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*", value):
+        raise ValidationError("Relation types must be lowercase snake_case.")
 
 
 class Concept(models.Model):
@@ -37,6 +43,7 @@ class Relation(models.Model):
     )
     type = models.SlugField(
         max_length=64,
+        validators=[validate_relation_type],
         help_text="Extensible relation predicate, for example prerequisite_of or part_of.",
     )
     metadata = models.JSONField(default=dict, blank=True)
@@ -57,6 +64,7 @@ class Relation(models.Model):
         ]
 
     def clean(self):
+        super().clean()
         if self.source_id == self.target_id and self.type not in {"equivalent_to", "related_to"}:
             raise ValidationError("Self-relations are only allowed for equivalent_to or related_to.")
 

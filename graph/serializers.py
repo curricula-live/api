@@ -13,3 +13,13 @@ class RelationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Relation
         fields = ["id", "source", "source_slug", "target", "target_slug", "type", "metadata", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        source = attrs.get("source", getattr(self.instance, "source", None))
+        target = attrs.get("target", getattr(self.instance, "target", None))
+        relation_type = attrs.get("type", getattr(self.instance, "type", None))
+        if source == target and relation_type not in {"equivalent_to", "related_to"}:
+            raise serializers.ValidationError(
+                "Self-relations are only allowed for equivalent_to or related_to."
+            )
+        return attrs

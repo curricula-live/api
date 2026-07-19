@@ -98,7 +98,7 @@ class GraphAdminSite(admin.AdminSite):
 
                 with transaction.atomic(), connection.cursor() as cursor:
                     if not allow_write:
-                        cursor.execute("SET LOCAL TRANSACTION READ ONLY")
+                        cursor.execute("SET TRANSACTION READ ONLY")
                     cursor.execute("SET LOCAL statement_timeout = '5s'")
                     cursor.execute("SET LOCAL lock_timeout = '1s'")
                     cursor.execute(statement)

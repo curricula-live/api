@@ -14,6 +14,7 @@ graph_admin.register(Concept, ConceptAdmin)
 graph_admin.register(Relation, RelationAdmin)
 
 urlpatterns = [
+    path("", health, name="root-health"),
     path("admin/", graph_admin.urls),
     path("api/", include(router.urls)),
     path("api/health/", health, name="health"),

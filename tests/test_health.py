@@ -34,6 +34,11 @@ def test_health_endpoint_returns_service_info(client):
 
 
 @pytest.mark.django_db
+def test_root_endpoint_is_a_health_check(client):
+    assert client.get("/").status_code == 200
+
+
+@pytest.mark.django_db
 def test_graph_endpoint_filters_to_matching_neighbourhood(client, sample_graph):
     response = client.get(reverse("graph-data"), {"q": "fifo", "limit": 10})
 
@@ -118,6 +123,33 @@ def test_relation_rejects_invalid_self_reference():
 
 
 @pytest.mark.django_db
+def test_relation_api_rejects_invalid_self_reference(
+    client, django_user_model, sample_graph
+):
+    queue, _, _ = sample_graph
+    user = django_user_model.objects.create_user(username="relation-editor")
+    user.user_permissions.add(Permission.objects.get(codename="add_relation"))
+    client.force_login(user)
+
+    response = client.post(
+        "/api/relations/",
+        {"source": str(queue.id), "target": str(queue.id), "type": "part_of"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_relation_type_requires_lowercase_snake_case():
+    source = Concept.objects.create(slug="source", label="Source")
+    target = Concept.objects.create(slug="target", label="Target")
+
+    with pytest.raises(ValidationError):
+        Relation(source=source, target=target, type="Prerequisite-Of").full_clean()
+
+
+@pytest.mark.django_db
 def test_staff_user_cannot_access_sql_workbench(client, django_user_model):
     user = django_user_model.objects.create_user(
         username="staff",
@@ -158,6 +190,37 @@ def test_superuser_sql_write_dry_run_rolls_back(client, django_user_model):
     concept.refresh_from_db()
     assert concept.label == "Array"
     assert b"rolled back" in response.content
+
+
+@pytest.mark.django_db
+def test_superuser_sql_read_only_query_executes(client, django_user_model):
+    if connection.vendor != "postgresql":
+        pytest.skip("The SQL workbench targets PostgreSQL.")
+
+    user = django_user_model.objects.create_superuser(
+        username="read-only-admin", email="admin@example.com", password="unused"
+    )
+    client.force_login(user)
+
+    response = client.post(
+        reverse("graph_admin:sql-workbench"), {"sql": "select 1 as value"}
+    )
+
+    assert response.status_code == 200
+    assert b"Read-only SQL executed" in response.content
+
+
+@pytest.mark.django_db
+def test_unique_typed_relation_is_a_database_constraint():
+    if connection.vendor != "postgresql":
+        pytest.skip("The graph schema targets PostgreSQL.")
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "select contype from pg_constraint "
+            "where conrelid = 'relation'::regclass "
+            "and conname = 'unique_typed_relation'"
+        )
+        assert cursor.fetchone() == ("u",)
 
 
 @pytest.mark.django_db
