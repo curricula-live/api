@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "DJANGO_SECRET_KEY=vercel-build-only-not-a-runtime-secret DATABASE_URL=sqlite:////tmp/vercel-build.sqlite3 python manage.py collectstatic --noinput",
-  "framework": null
+  "framework": null,
+  "outputDirectory": "staticfiles"
 }
