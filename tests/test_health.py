@@ -1,5 +1,8 @@
-def test_health_returns_service_status(client):
-    response = client.get("/health")
+from django.urls import reverse
+
+def test_health_endpoint(client):
+    # respsonse = client.get("/health/")
+    response = client.get(reverse("health"))
 
     assert response.status_code == 200
     assert response.json() == {
