@@ -26,15 +26,11 @@ SECRET_KEY = env(
 )
 
 
-SECRET_KEY = os.environ.get(
-    "DJANGO_SECRET_KEY",
-    "django-insecure-local-development-only",
-)
+SECRET_KEY = env("DJANGO_SECRET_KEY")
 
-DEBUG = env.bool("DJANGO_DEBUG", default=False)
+DEBUG = env.bool("DJANGO_DEBUG", default=False)
 
 _default_hosts = (
-
     "localhost",
     "127.0.0.1",
     "[::1]",
