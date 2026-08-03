@@ -10,22 +10,54 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import environ
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+env = environ.Env()
+environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+SECRET_KEY = env(
+    "DJANGO_SECRET_KEY",
+    default="django-insecure-local-development-only",
+)
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-uxp7)i7y(y6f4u%pra%l#@njpls!^(v*b@e@8m7%5q#25@ll0w"
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+SECRET_KEY = os.environ.get(
+    "DJANGO_SECRET_KEY",
+    "django-insecure-local-development-only",
+)
 
-ALLOWED_HOSTS = []
+DEBUG = os.environ.get("DJANGO_DEBUG", "false").lower() in (
+    "true",
+    "1",
+    "t",
+    "yes",
+    "y",
+    "on",
+    "enable",
+    "enabled",
+    "active",
+)
+
+_default_hosts = {
+    "localhost",
+    "127.0.0.1",
+    "[::1]",
+    "testserver",
+}
+
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get(
+        "DJANGO_ALLOWED_HOSTS",
+        ",".join(_default_hosts),
+    ).split(",")
+    if host.strip()
+]
 
 
 # Application definition
