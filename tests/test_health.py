@@ -1,28 +1,12 @@
-import pytest
-from fastapi.testclient import TestClient
+from django.urls import reverse
 
-from app.main import app
-from app import APP_VERSION
-
-
-@pytest.fixture
-def client():
-    return TestClient(app)
-
-
-def test_root_endpoint_returns_service_info(client):
-    response = client.get("/")
+def test_health_endpoint(client):
+    # respsonse = client.get("/health/")
+    response = client.get(reverse("health"))
 
     assert response.status_code == 200
     assert response.json() == {
-        "status": "online",
-        "service": "curricula.live api",
-        "version": APP_VERSION,
-    }
+            "status": "ok",
+            "service": "curricula.live api",
+            }   
 
-
-def test_health_endpoint_returns_ok_status(client):
-    response = client.get("/health")
-
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
