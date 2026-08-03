@@ -43,12 +43,12 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "false").lower() in (
     "active",
 )
 
-_default_hosts = {
+_default_hosts = (
     "localhost",
     "127.0.0.1",
     "[::1]",
     "testserver",
-}
+)
 
 ALLOWED_HOSTS = [
     host.strip()
