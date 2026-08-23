@@ -105,6 +105,17 @@ def _bounded_query_parameter(request, name, default, maximum):
     return value, None
 
 
+def _prerequisite_query(target_slug):
+    return (
+        Relation.objects.filter(
+            target_id=target_slug,
+            type_id=PREREQUISITE_RELATION_TYPE,
+        )
+        .order_by("source_id")
+        .values_list("source_id", flat=True)
+    )
+
+
 @require_GET
 def concept_prerequisites(request, slug):
     concept = get_object_or_404(Concept, slug=slug)
@@ -121,7 +132,7 @@ def concept_prerequisites(request, slug):
     if error:
         return JsonResponse({"error": error}, status=400)
 
-    if max_depth == 0 or max_nodes == 0:
+    if max_depth == 0:
         return JsonResponse(
             {
                 "concept": {"slug": concept.slug},
@@ -129,6 +140,19 @@ def concept_prerequisites(request, slug):
                 "max_depth": max_depth,
                 "max_nodes": max_nodes,
                 "truncated": False,
+                "results": [],
+            }
+        )
+
+    if max_nodes == 0:
+        truncated = _prerequisite_query(concept.slug).exists()
+        return JsonResponse(
+            {
+                "concept": {"slug": concept.slug},
+                "relation_type": PREREQUISITE_RELATION_TYPE,
+                "max_depth": max_depth,
+                "max_nodes": max_nodes,
+                "truncated": truncated,
                 "results": [],
             }
         )
@@ -143,14 +167,9 @@ def concept_prerequisites(request, slug):
         if depth >= max_depth:
             continue
 
-        prerequisite_slugs = list(
-            Relation.objects.filter(
-                target_id=current_slug,
-                type_id=PREREQUISITE_RELATION_TYPE,
-            )
-            .order_by("source_id")
-            .values_list("source_id", flat=True)
-        )
+        remaining = max_nodes - len(results)
+        # Fetch at most enough rows to fill the response plus one sentinel row.
+        prerequisite_slugs = _prerequisite_query(current_slug)[: remaining + 1]
 
         for prerequisite_slug in prerequisite_slugs:
             if prerequisite_slug in visited:
