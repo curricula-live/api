@@ -62,3 +62,19 @@ def relation_detail(request, relation_id):
 def relation_type_list(request):
     relation_types = RelationType.objects.order_by("slug").values("slug")
     return JsonResponse({"results": list(relation_types)})
+
+
+@require_GET
+def concept_neighborhood(request, slug):
+    concept = get_object_or_404(Concept, slug=slug)
+    ordering = ("source_id", "type_id", "target_id", "id")
+    outgoing = Relation.objects.filter(source=concept).order_by(*ordering)
+    incoming = Relation.objects.filter(target=concept).order_by(*ordering)
+
+    return JsonResponse(
+        {
+            "concept": {"slug": concept.slug},
+            "outgoing": [_relation_payload(relation) for relation in outgoing],
+            "incoming": [_relation_payload(relation) for relation in incoming],
+        }
+    )
