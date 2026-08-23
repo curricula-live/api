@@ -3,20 +3,27 @@ from django.contrib import admin
 from core.models import Concept, Relation, RelationType
 
 
+class ImmutablePrimaryKeyAdmin(admin.ModelAdmin):
+    def get_readonly_fields(self, request, obj=None):
+        if obj is None:
+            return ()
+        return (self.model._meta.pk.name,)
+
+
 @admin.register(Concept)
-class ConceptAdmin(admin.ModelAdmin):
+class ConceptAdmin(ImmutablePrimaryKeyAdmin):
     search_fields = ("slug",)
     ordering = ("slug",)
 
 
 @admin.register(RelationType)
-class RelationTypeAdmin(admin.ModelAdmin):
+class RelationTypeAdmin(ImmutablePrimaryKeyAdmin):
     search_fields = ("slug",)
     ordering = ("slug",)
 
 
 @admin.register(Relation)
-class RelationAdmin(admin.ModelAdmin):
+class RelationAdmin(ImmutablePrimaryKeyAdmin):
     list_display = ("source", "type", "target")
     list_filter = ("type",)
     search_fields = ("source__slug", "target__slug", "type__slug")
