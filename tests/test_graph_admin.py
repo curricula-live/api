@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 from django.contrib import admin
 from django.urls import reverse
@@ -24,6 +26,24 @@ def test_relation_admin_supports_graph_discovery_and_editing():
         "type__slug",
     )
     assert relation_admin.autocomplete_fields == ("source", "type", "target")
+
+
+@pytest.mark.parametrize(
+    ("model", "new_object", "primary_key"),
+    [
+        (Concept, Concept(slug="new-concept"), "slug"),
+        (RelationType, RelationType(slug="new-type"), "slug"),
+        (Relation, Relation(id=uuid.uuid4()), "id"),
+    ],
+)
+def test_graph_admin_primary_keys_are_editable_only_when_creating(
+    rf, model, new_object, primary_key
+):
+    model_admin = admin.site._registry[model]
+    request = rf.get("/admin/")
+
+    assert model_admin.get_readonly_fields(request, obj=None) == ()
+    assert model_admin.get_readonly_fields(request, obj=new_object) == (primary_key,)
 
 
 @pytest.mark.django_db
