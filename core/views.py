@@ -2,7 +2,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_GET
 
-from core.models import Concept, Relation
+from core.models import Concept, Relation, RelationType
 
 
 def health(request):
@@ -56,3 +56,9 @@ def relation_list(request):
 def relation_detail(request, relation_id):
     relation = get_object_or_404(Relation, id=relation_id)
     return JsonResponse(_relation_payload(relation))
+
+
+@require_GET
+def relation_type_list(request):
+    relation_types = RelationType.objects.order_by("slug").values("slug")
+    return JsonResponse({"results": list(relation_types)})
