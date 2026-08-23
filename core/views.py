@@ -105,15 +105,14 @@ def _bounded_query_parameter(request, name, default, maximum):
     return value, None
 
 
-def _prerequisite_query(target_slug):
-    return (
-        Relation.objects.filter(
-            target_id=target_slug,
-            type_id=PREREQUISITE_RELATION_TYPE,
-        )
-        .order_by("source_id")
-        .values_list("source_id", flat=True)
+def _prerequisite_query(target_slug, visited=None):
+    query = Relation.objects.filter(
+        target_id=target_slug,
+        type_id=PREREQUISITE_RELATION_TYPE,
     )
+    if visited:
+        query = query.exclude(source_id__in=visited)
+    return query.order_by("source_id").values_list("source_id", flat=True)
 
 
 @require_GET
@@ -145,7 +144,7 @@ def concept_prerequisites(request, slug):
         )
 
     if max_nodes == 0:
-        truncated = _prerequisite_query(concept.slug).exists()
+        truncated = _prerequisite_query(concept.slug, {concept.slug}).exists()
         return JsonResponse(
             {
                 "concept": {"slug": concept.slug},
@@ -168,12 +167,10 @@ def concept_prerequisites(request, slug):
             continue
 
         remaining = max_nodes - len(results)
-        # Fetch at most enough rows to fill the response plus one sentinel row.
-        prerequisite_slugs = _prerequisite_query(current_slug)[: remaining + 1]
+        # Cycle-filter in SQL, then fetch only the remaining capacity plus a sentinel.
+        prerequisite_slugs = _prerequisite_query(current_slug, visited)[: remaining + 1]
 
         for prerequisite_slug in prerequisite_slugs:
-            if prerequisite_slug in visited:
-                continue
             if len(results) >= max_nodes:
                 truncated = True
                 queue.clear()
