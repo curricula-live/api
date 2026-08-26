@@ -130,7 +130,7 @@ _default_cors_origins = (
 CORS_ALLOWED_ORIGINS = _csv_setting(
     "DJANGO_CORS_ALLOWED_ORIGINS", _default_cors_origins
 )
-CORS_ALLOWED_METHODS = ("GET", "HEAD", "OPTIONS")
+CORS_ALLOWED_METHODS = ("GET", "OPTIONS")
 CORS_ALLOWED_HEADERS = ("Accept", "Content-Type", "Authorization")
 CORS_MAX_AGE = 86400
 
