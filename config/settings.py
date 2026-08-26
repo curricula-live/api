@@ -10,9 +10,10 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
-import environ
 import os
 from pathlib import Path
+
+import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,15 +21,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
 environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
-SECRET_KEY = env(
-    "DJANGO_SECRET_KEY",
-    default="django-insecure-local-development-only",
-)
+APP_ENV = env("APP_ENV", default="development")
+IS_PRODUCTION = APP_ENV.lower() == "production"
 
-
+# Keep the secret explicit in every environment. The example .env documents a
+# local-only value; deployed secrets belong in the hosting provider.
 SECRET_KEY = env("DJANGO_SECRET_KEY")
-
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
+
+
+def _csv_setting(name, default=()):
+    raw_value = os.environ.get(name)
+    if raw_value is None:
+        return list(default)
+    return [value.strip() for value in raw_value.split(",") if value.strip()]
+
 
 _default_hosts = (
     "localhost",
@@ -36,16 +43,20 @@ _default_hosts = (
     "[::1]",
     "testserver",
 )
+ALLOWED_HOSTS = _csv_setting("DJANGO_ALLOWED_HOSTS", _default_hosts)
 
-
-ALLOWED_HOSTS = [
-    host.strip()
-    for host in os.environ.get(
-        "DJANGO_ALLOWED_HOSTS",
-        ",".join(_default_hosts),
-    ).split(",")
-    if host.strip()
-]
+# Vercel preview and production deployment hostnames are generated dynamically.
+# Accept only the exact hostnames Vercel exposes for the current deployment,
+# rather than allowing all *.vercel.app hosts.
+_vercel_hosts = []
+for variable in ("VERCEL_URL", "VERCEL_PROJECT_PRODUCTION_URL"):
+    host = os.environ.get(variable)
+    if host:
+        host = host.removeprefix("https://").removeprefix("http://").split("/", 1)[0]
+        if host and host not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(host)
+        if host:
+            _vercel_hosts.append(host)
 
 
 # Application definition
@@ -62,6 +73,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "core.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -98,6 +110,7 @@ DATABASES = {
     "default": env.db("DATABASE_URL"),
 }
 
+# Serverless instances should not retain database connections between requests.
 DATABASES["default"]["CONN_MAX_AGE"] = 0
 
 if DATABASES["default"]["ENGINE"] == "django.db.backends.postgresql":
@@ -105,6 +118,38 @@ if DATABASES["default"]["ENGINE"] == "django.db.backends.postgresql":
 
     DATABASES["default"].setdefault("OPTIONS", {})
     DATABASES["default"]["OPTIONS"]["prepare_threshold"] = None
+
+
+# Cross-origin API access
+
+_default_cors_origins = (
+    ("https://curricula.live", "https://www.curricula.live")
+    if IS_PRODUCTION
+    else ("http://localhost:3000", "http://127.0.0.1:3000")
+)
+CORS_ALLOWED_ORIGINS = _csv_setting(
+    "DJANGO_CORS_ALLOWED_ORIGINS", _default_cors_origins
+)
+CORS_ALLOWED_METHODS = ("GET", "HEAD", "OPTIONS")
+CORS_ALLOWED_HEADERS = ("Accept", "Content-Type", "Authorization")
+CORS_MAX_AGE = 86400
+
+_default_csrf_origins = (
+    (
+        "https://api.curricula.live",
+        "https://curricula.live",
+        "https://www.curricula.live",
+    )
+    if IS_PRODUCTION
+    else ()
+)
+CSRF_TRUSTED_ORIGINS = _csv_setting(
+    "DJANGO_CSRF_TRUSTED_ORIGINS", _default_csrf_origins
+)
+for host in _vercel_hosts:
+    origin = f"https://{host}"
+    if origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(origin)
 
 
 # Password validation
@@ -130,18 +175,33 @@ AUTH_PASSWORD_VALIDATORS = [
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
 LANGUAGE_CODE = "en-us"
-
 TIME_ZONE = "UTC"
-
 USE_I18N = True
-
 USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+
+# Production transport/security settings. Vercel terminates TLS before requests
+# reach Django and forwards the original protocol in X-Forwarded-Proto.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = env.bool("DJANGO_SECURE_SSL_REDIRECT", default=IS_PRODUCTION)
+SESSION_COOKIE_SECURE = env.bool("DJANGO_SESSION_COOKIE_SECURE", default=IS_PRODUCTION)
+CSRF_COOKIE_SECURE = env.bool("DJANGO_CSRF_COOKIE_SECURE", default=IS_PRODUCTION)
+SECURE_HSTS_SECONDS = env.int(
+    "DJANGO_SECURE_HSTS_SECONDS", default=31536000 if IS_PRODUCTION else 0
+)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool(
+    "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", default=False
+)
+SECURE_HSTS_PRELOAD = env.bool("DJANGO_SECURE_HSTS_PRELOAD", default=False)
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
