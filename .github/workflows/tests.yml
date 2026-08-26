@@ -31,3 +31,12 @@ jobs:
 
       - name: Run tests
         run: uv run pytest
+
+      - name: Check production deployment settings
+        env:
+          APP_ENV: production
+          DJANGO_SECRET_KEY: ci-only-not-a-production-secret-4b9c0c3c42b94b3abdc8a58b7d8eacbb
+          DJANGO_DEBUG: "false"
+          DJANGO_ALLOWED_HOSTS: api.curricula.live
+          DATABASE_URL: "sqlite://:memory:"
+        run: uv run python manage.py check --deploy
