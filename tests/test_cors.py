@@ -29,6 +29,6 @@ def test_allowed_preflight_returns_declared_read_only_contract(client, settings)
 
     assert response.status_code == 204
     assert response["Access-Control-Allow-Origin"] == "https://curricula.live"
-    assert response["Access-Control-Allow-Methods"] == "GET, HEAD, OPTIONS"
+    assert response["Access-Control-Allow-Methods"] == "GET, OPTIONS"
     assert response["Access-Control-Allow-Headers"] == "Accept, Content-Type, Authorization"
     assert response["Access-Control-Max-Age"] == "86400"
