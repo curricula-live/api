@@ -21,7 +21,7 @@ def test_allowed_preflight_returns_declared_read_only_contract(client, settings)
     settings.CORS_ALLOWED_ORIGINS = ["https://curricula.live"]
 
     response = client.options(
-        "/api/concepts/",
+        "/v1/concepts/",
         HTTP_ORIGIN="https://curricula.live",
         HTTP_ACCESS_CONTROL_REQUEST_METHOD="GET",
         HTTP_ACCESS_CONTROL_REQUEST_HEADERS="Authorization, Content-Type",

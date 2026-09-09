@@ -14,6 +14,17 @@ MAX_DEPTH = 10
 MAX_NODES = 500
 
 
+@require_GET
+def api_root(request):
+    return JsonResponse(
+        {
+            "service": "curricula.live API",
+            "latest_version": "v1",
+            "versions": {"v1": "/v1/"},
+        }
+    )
+
+
 def health(request):
     return JsonResponse(
         {

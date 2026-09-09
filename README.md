@@ -28,8 +28,9 @@ The platform represents curriculum content as a graph of concepts and typed rela
 - PostgreSQL connection through provider-neutral `DATABASE_URL`.
 - Compatibility settings for PostgreSQL poolers.
 - Django admin and built-in authentication foundation.
+- JSON discovery endpoint at `/`.
 - JSON health endpoint at `/health/`.
-- Read endpoints for concepts, relations, relation types, neighbourhoods and prerequisite traversal.
+- Versioned read endpoints for concepts, relations, relation types, neighbourhoods and prerequisite traversal.
 - Explicit cross-origin access for configured curricula.live frontend origins; no wildcard CORS.
 - Environment configuration through `django-environ`.
 - Dependency and virtual-environment management through `uv`.
@@ -42,15 +43,28 @@ The platform represents curriculum content as a graph of concepts and typed rela
 
 | Method | Path | Purpose |
 |---|---|---|
+| `GET` | `/` | API discovery metadata |
 | `GET` | `/health/` | Service readiness and smoke-check response |
 | varies | `/admin/` | Django administrative interface |
-| `GET` | `/api/concepts/` | List concepts |
-| `GET` | `/api/concepts/<slug>/` | Read a concept |
-| `GET` | `/api/concepts/<slug>/neighborhood/` | Read incoming/outgoing graph neighbourhood |
-| `GET` | `/api/concepts/<slug>/prerequisites/` | Bounded prerequisite traversal |
-| `GET` | `/api/relations/` | List/filter relations |
-| `GET` | `/api/relations/<uuid>/` | Read a relation |
-| `GET` | `/api/relation-types/` | List relation types |
+| `GET` | `/v1/concepts/` | List concepts |
+| `GET` | `/v1/concepts/<slug>/` | Read a concept |
+| `GET` | `/v1/concepts/<slug>/neighborhood/` | Read incoming/outgoing graph neighbourhood |
+| `GET` | `/v1/concepts/<slug>/prerequisites/` | Bounded prerequisite traversal |
+| `GET` | `/v1/relations/` | List/filter relations |
+| `GET` | `/v1/relations/<uuid>/` | Read a relation |
+| `GET` | `/v1/relation-types/` | List relation types |
+
+Example discovery response:
+
+```json
+{
+  "service": "curricula.live API",
+  "latest_version": "v1",
+  "versions": {
+    "v1": "/v1/"
+  }
+}
+```
 
 Example health response:
 
@@ -61,7 +75,7 @@ Example health response:
 }
 ```
 
-The `/api/` prefix is the current development contract. Public API versioning is intentionally tracked separately from deployment infrastructure.
+The dedicated `api.curricula.live` hostname makes a second `/api/` namespace redundant. Stable public consumers select an explicit major version such as `/v1/`; bare paths such as `/concepts/` are not floating aliases. A future `/v2/` should be introduced only for genuinely breaking contract changes.
 
 ## Architecture
 
@@ -123,8 +137,8 @@ api/
 │   ├── admin.py          # Domain admin configuration
 │   ├── middleware.py     # Narrow CORS policy
 │   ├── models.py         # Unmanaged curriculum read models
-│   ├── urls.py           # API routes
-│   ├── views.py          # Health and graph read endpoints
+│   ├── urls.py           # Versioned graph routes
+│   ├── views.py          # Discovery, health and graph read endpoints
 │   └── migrations/
 ├── tests/                # API, graph, admin and deployment-facing tests
 ├── docs/
@@ -251,7 +265,9 @@ uv run python manage.py runserver
 
 Open:
 
+- API discovery: `http://127.0.0.1:8000/`
 - Health endpoint: `http://127.0.0.1:8000/health/`
+- Concepts: `http://127.0.0.1:8000/v1/concepts/`
 - Admin interface: `http://127.0.0.1:8000/admin/`
 
 ## Test the service
@@ -259,10 +275,11 @@ Open:
 ### Browser or curl
 
 ```bash
+curl http://127.0.0.1:8000/
 curl http://127.0.0.1:8000/health/
 ```
 
-Expected response:
+Expected health response:
 
 ```json
 {"status":"ok","service":"curricula.live api"}
@@ -274,7 +291,7 @@ Expected response:
 uv run pytest
 ```
 
-The suite covers health, domain read models, concepts, relations, relation types, neighbourhoods, prerequisite traversal, admin configuration and CORS behavior.
+The suite covers discovery/routing, health, domain read models, concepts, relations, relation types, neighbourhoods, prerequisite traversal, admin configuration and CORS behavior.
 
 ### Why tests use SQLite
 
@@ -397,7 +414,7 @@ DJANGO_CSRF_TRUSTED_ORIGINS=https://api.curricula.live,https://curricula.live,ht
 
 Production migrations are **not** run automatically on preview deployments. They are a controlled release step so previews cannot mutate a shared production database.
 
-See [`docs/deployment.md`](docs/deployment.md) for the Vercel project setup, custom-domain/DNS procedure, migration flow, static/admin verification, security settings and migration-away strategy.
+See [`docs/deployment.md`](docs/deployment.md) for the Vercel project setup, public routing contract, custom-domain/DNS procedure, migration flow, static/admin verification, security settings and migration-away strategy.
 
 CI also runs:
 
@@ -410,7 +427,6 @@ against a production-shaped configuration.
 ## Known limitations
 
 - PostgreSQL-specific behaviour is not yet covered by a dedicated integration-test environment.
-- The public API contract is not versioned yet; `/api/` remains the current development prefix.
 - API authentication and write authorization have not yet been introduced.
 - There is no generated OpenAPI schema yet.
 - Production deployment still requires account-level Vercel environment variables and custom-domain configuration outside the repository.

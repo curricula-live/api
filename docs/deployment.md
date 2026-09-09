@@ -24,7 +24,23 @@ Import `curricula-live/api` as its own Vercel project.
 
 Vercel's Django support detects `manage.py`, the WSGI entry point in `config/wsgi.py`, and Django staticfiles. No legacy Python builder or catch-all `vercel.json` routing configuration is required.
 
-Use `main` as the production branch once the current integration work is merged. Pull requests should receive preview deployments through the Git integration.
+Use `main` as the production branch once the current integration work is merged. Pull requests and integration branches should receive preview deployments through the Git integration.
+
+## Public API routing
+
+The dedicated API hostname already identifies the service, so the public contract does not add a redundant `/api/` namespace.
+
+```text
+https://api.curricula.live/
+https://api.curricula.live/health/
+https://api.curricula.live/v1/concepts/
+https://api.curricula.live/v1/relations/
+https://api.curricula.live/v1/relation-types/
+```
+
+`/` is a discovery endpoint that advertises the latest stable API version. Stable consumers select an explicit major version. Bare resource aliases such as `/concepts/` are not used, and `/api/...` is not part of the canonical public contract.
+
+A future `/v2/` should be introduced only for genuinely breaking contract changes. Additive endpoints or compatible fields remain within the current major version.
 
 ## Production environment
 
@@ -100,8 +116,15 @@ uv run python manage.py check --deploy
 After the custom domain is active:
 
 ```bash
+curl -i https://api.curricula.live/
 curl -i https://api.curricula.live/health/
-curl -i -H 'Origin: https://curricula.live' https://api.curricula.live/api/concepts/
+curl -i -H 'Origin: https://curricula.live' https://api.curricula.live/v1/concepts/
+```
+
+Expected discovery payload:
+
+```json
+{"service":"curricula.live API","latest_version":"v1","versions":{"v1":"/v1/"}}
 ```
 
 Expected health payload:
@@ -110,7 +133,7 @@ Expected health payload:
 {"status":"ok","service":"curricula.live api"}
 ```
 
-The second request should include:
+The versioned API request should include:
 
 ```text
 Access-Control-Allow-Origin: https://curricula.live
