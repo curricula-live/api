@@ -1,0 +1,42 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --frozen --dev
+
+      - name: Run tests
+        run: uv run pytest
+
+      - name: Check production deployment settings
+        env:
+          APP_ENV: production
+          DJANGO_SECRET_KEY: ci-only-not-a-production-secret-4b9c0c3c42b94b3abdc8a58b7d8eacbb
+          DJANGO_DEBUG: "false"
+          DJANGO_ALLOWED_HOSTS: api.curricula.live
+          DATABASE_URL: "sqlite://:memory:"
+        run: uv run python manage.py check --deploy

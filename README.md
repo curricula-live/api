@@ -1,6 +1,6 @@
 # curricula.live API
 
-**Django and PostgreSQL foundation for a curriculum knowledge platform that will model concepts, relationships and learning paths.**
+**Django and PostgreSQL backend for a curriculum knowledge platform that models concepts, relationships and learning paths.**
 
 <p align="center">
   <img src="docs/architecture.svg" alt="curricula.live API architecture" width="100%">
@@ -9,10 +9,9 @@
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white">
   <img alt="Django" src="https://img.shields.io/badge/Django-5.2-0C4B33?logo=django&logoColor=white">
-  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-Supabase%20compatible-4169E1?logo=postgresql&logoColor=white">
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-provider%20neutral-4169E1?logo=postgresql&logoColor=white">
   <img alt="Package manager" src="https://img.shields.io/badge/package%20manager-uv-6B5DD3">
   <img alt="Tests" src="https://img.shields.io/badge/tests-pytest-0A9EDC?logo=pytest&logoColor=white">
-  <img alt="Status" src="https://img.shields.io/badge/status-foundation-E1A95F">
 </p>
 
 ## Purpose
@@ -21,29 +20,51 @@
 
 > **What must a learner understand, and what should come before it?**
 
-The wider platform is intended to represent curriculum content as a graph of concepts and typed relationships. This repository is the backend API foundation: a deliberately small Django service with environment-based configuration, PostgreSQL connectivity, Django administration, a health endpoint and an isolated test setup.
-
-The current codebase is not yet the complete curriculum API. It establishes the infrastructure on which concept, relation, curriculum and recommendation features can be added through focused changes.
+The platform represents curriculum content as a graph of concepts and typed relationships. This repository is the Django backend API, with environment-based configuration, PostgreSQL connectivity, administration, graph read endpoints, health checks and isolated tests.
 
 ## Current capabilities
 
-- Django 5.2 project running on Python 3.12.
-- PostgreSQL connection through `DATABASE_URL`.
-- Compatibility settings for Supabase/PostgreSQL poolers.
+- Django 5.2 on Python 3.12.
+- PostgreSQL connection through provider-neutral `DATABASE_URL`.
+- Compatibility settings for PostgreSQL poolers.
 - Django admin and built-in authentication foundation.
+- JSON discovery endpoint at `/`.
 - JSON health endpoint at `/health/`.
+- Versioned read endpoints for concepts, relations, relation types, neighbourhoods and prerequisite traversal.
+- Explicit cross-origin access for configured curricula.live frontend origins; no wildcard CORS.
 - Environment configuration through `django-environ`.
 - Dependency and virtual-environment management through `uv`.
 - `pytest` and `pytest-django` test infrastructure.
 - In-memory SQLite test database isolated from development and deployed PostgreSQL data.
 - WSGI and ASGI entry points for deployment flexibility.
+- Vercel-compatible production settings with exact preview-host handling.
 
 ## Current HTTP surface
 
 | Method | Path | Purpose |
 |---|---|---|
+| `GET` | `/` | API discovery metadata |
 | `GET` | `/health/` | Service readiness and smoke-check response |
 | varies | `/admin/` | Django administrative interface |
+| `GET` | `/v1/concepts/` | List concepts |
+| `GET` | `/v1/concepts/<slug>/` | Read a concept |
+| `GET` | `/v1/concepts/<slug>/neighborhood/` | Read incoming/outgoing graph neighbourhood |
+| `GET` | `/v1/concepts/<slug>/prerequisites/` | Bounded prerequisite traversal |
+| `GET` | `/v1/relations/` | List/filter relations |
+| `GET` | `/v1/relations/<uuid>/` | Read a relation |
+| `GET` | `/v1/relation-types/` | List relation types |
+
+Example discovery response:
+
+```json
+{
+  "service": "curricula.live API",
+  "latest_version": "v1",
+  "versions": {
+    "v1": "/v1/"
+  }
+}
+```
 
 Example health response:
 
@@ -54,18 +75,18 @@ Example health response:
 }
 ```
 
-Domain endpoints for curriculum concepts and relationships have not yet been added to this Django foundation.
+The dedicated `api.curricula.live` hostname makes a second `/api/` namespace redundant. Stable public consumers select an explicit major version such as `/v1/`; bare paths such as `/concepts/` are not floating aliases. A future `/v2/` should be introduced only for genuinely breaking contract changes.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    Web[Future curricula.live web client]
+    Web[curricula.live web client]
     Admin[Django admin user]
     Monitor[Health monitor]
     Django[Django 5.2 API]
     Core[core application]
-    DB[(PostgreSQL / Supabase)]
+    DB[(Managed PostgreSQL)]
     Tests[pytest-django]
     SQLite[(In-memory SQLite)]
 
@@ -87,6 +108,7 @@ flowchart TD
     Secret[DJANGO_SECRET_KEY]
     Debug[DJANGO_DEBUG]
     Hosts[DJANGO_ALLOWED_HOSTS]
+    CORS[DJANGO_CORS_ALLOWED_ORIGINS]
     URL[DATABASE_URL]
     Psycopg[psycopg 3]
     Postgres[(PostgreSQL)]
@@ -95,6 +117,7 @@ flowchart TD
     Settings --> Secret
     Settings --> Debug
     Settings --> Hosts
+    Settings --> CORS
     Settings --> URL
     URL --> Psycopg
     Psycopg --> Postgres
@@ -105,20 +128,23 @@ flowchart TD
 ```text
 api/
 ├── config/
-│   ├── settings.py       # Runtime configuration
+│   ├── settings.py       # Runtime and production configuration
 │   ├── test_settings.py  # Isolated test environment
 │   ├── urls.py           # Root URL routing
 │   ├── asgi.py           # ASGI application entry point
 │   └── wsgi.py           # WSGI application entry point
 ├── core/
-│   ├── apps.py
-│   ├── views.py          # Health endpoint
+│   ├── admin.py          # Domain admin configuration
+│   ├── middleware.py     # Narrow CORS policy
+│   ├── models.py         # Unmanaged curriculum read models
+│   ├── urls.py           # Versioned graph routes
+│   ├── views.py          # Discovery, health and graph read endpoints
 │   └── migrations/
-├── tests/
-│   └── test_health.py    # Health-endpoint contract test
+├── tests/                # API, graph, admin and deployment-facing tests
 ├── docs/
-│   └── architecture.svg
-├── .env.example          # Local configuration template
+│   ├── architecture.svg
+│   └── deployment.md     # Vercel production runbook
+├── .env.example          # Local/environment configuration template
 ├── .python-version       # Python runtime selection
 ├── manage.py             # Django management command entry point
 ├── pyproject.toml        # Project and dependency declaration
@@ -132,7 +158,7 @@ api/
 - Python 3.12 or newer within the supported project range.
 - [`uv`](https://docs.astral.sh/uv/) for dependency and environment management.
 - PostgreSQL for normal development and deployment.
-- A database connection string, such as a Supabase Session Pooler URL.
+- A PostgreSQL connection string exposed as `DATABASE_URL`.
 
 ## Local setup
 
@@ -205,10 +231,11 @@ APP_ENV=development
 DJANGO_SECRET_KEY=replace-with-generated-secret
 DJANGO_DEBUG=true
 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,testserver
+DJANGO_CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require
 ```
 
-For Supabase local development, use the project’s **Session Pooler** connection string and replace the password placeholder. Never commit `.env`.
+Any PostgreSQL provider can be used. Never commit `.env`.
 
 ### 5. Verify the Django configuration
 
@@ -222,7 +249,7 @@ uv run python manage.py check
 uv run python manage.py migrate
 ```
 
-At this stage, migrations primarily create Django’s built-in authentication, administration, session and content-type tables.
+The curriculum graph tables are currently read through unmanaged models. Django migrations still manage Django's built-in authentication, administration, session and content-type tables.
 
 ### 7. Create an administrator
 
@@ -238,7 +265,9 @@ uv run python manage.py runserver
 
 Open:
 
+- API discovery: `http://127.0.0.1:8000/`
 - Health endpoint: `http://127.0.0.1:8000/health/`
+- Concepts: `http://127.0.0.1:8000/v1/concepts/`
 - Admin interface: `http://127.0.0.1:8000/admin/`
 
 ## Test the service
@@ -246,10 +275,11 @@ Open:
 ### Browser or curl
 
 ```bash
+curl http://127.0.0.1:8000/
 curl http://127.0.0.1:8000/health/
 ```
 
-Expected response:
+Expected health response:
 
 ```json
 {"status":"ok","service":"curricula.live api"}
@@ -261,7 +291,7 @@ Expected response:
 uv run pytest
 ```
 
-The current suite verifies the status code and exact JSON contract of the health endpoint.
+The suite covers discovery/routing, health, domain read models, concepts, relations, relation types, neighbourhoods, prerequisite traversal, admin configuration and CORS behavior.
 
 ### Why tests use SQLite
 
@@ -273,16 +303,16 @@ DATABASE_URL=sqlite://:memory:
 
 before importing normal settings. Consequently:
 
-- tests cannot accidentally modify the developer’s Supabase/PostgreSQL database;
+- tests cannot accidentally modify a developer or deployed PostgreSQL database;
 - the suite does not require network access;
 - test state is temporary and discarded after the process exits;
 - health and application tests remain fast.
 
-Database-specific behaviour still requires separate PostgreSQL integration tests when domain models and queries are introduced.
+Database-specific behaviour still requires separate PostgreSQL integration tests.
 
 ## Database configuration
 
-The normal application requires `DATABASE_URL`:
+The application requires `DATABASE_URL`:
 
 ```dotenv
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DATABASE
@@ -294,25 +324,35 @@ For hosted PostgreSQL requiring TLS:
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require
 ```
 
-When the configured engine is PostgreSQL, the settings currently apply:
+When the configured engine is PostgreSQL, settings apply:
 
 - `CONN_MAX_AGE = 0`;
 - disabled server-side cursors;
 - `prepare_threshold = None`.
 
-These choices avoid connection-state problems with transaction or session poolers, particularly during early Supabase-backed deployment work. They trade some persistent-connection optimisation for simpler pooler compatibility.
+These choices avoid connection-state problems with poolers and serverless instances. They trade some persistent-connection optimisation for predictable provider compatibility.
+
+The API must not import provider-specific database SDKs. Moving from one managed PostgreSQL provider to another should primarily be a `DATABASE_URL` and compatibility-validation change.
 
 ## Environment variables
 
 | Variable | Required | Example | Description |
 |---|---:|---|---|
 | `DJANGO_SECRET_KEY` | yes | generated random value | Cryptographic signing secret |
-| `DJANGO_DEBUG` | no | `true` | Enables Django debug mode; defaults to `false` |
-| `DJANGO_ALLOWED_HOSTS` | no | `localhost,api.example.com` | Comma-separated accepted hostnames |
-| `DATABASE_URL` | yes | PostgreSQL URL | Default database connection |
-| `APP_ENV` | currently informational | `development` | Intended environment label |
+| `DJANGO_DEBUG` | no | `false` | Enables Django debug mode; defaults to `false` |
+| `DJANGO_ALLOWED_HOSTS` | no | `api.curricula.live` | Comma-separated accepted hostnames |
+| `DJANGO_CORS_ALLOWED_ORIGINS` | no | `https://curricula.live` | Browser origins allowed to call the read API |
+| `DJANGO_CSRF_TRUSTED_ORIGINS` | no | `https://api.curricula.live` | Trusted origins for Django CSRF checks |
+| `DATABASE_URL` | yes | PostgreSQL URL | Database connection |
+| `APP_ENV` | no | `production` | Enables production-safe defaults when set to `production` |
+| `DJANGO_SECURE_SSL_REDIRECT` | no | `true` | Override HTTPS redirect behavior |
+| `DJANGO_SESSION_COOKIE_SECURE` | no | `true` | Override secure session-cookie behavior |
+| `DJANGO_CSRF_COOKIE_SECURE` | no | `true` | Override secure CSRF-cookie behavior |
+| `DJANGO_SECURE_HSTS_SECONDS` | no | `31536000` | Override HSTS lifetime |
+| `DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS` | no | `false` | Opt into HSTS for subdomains |
+| `DJANGO_SECURE_HSTS_PRELOAD` | no | `false` | Opt into HSTS preload signaling |
 
-The current `settings.py` assigns `SECRET_KEY` twice. The second assignment makes `DJANGO_SECRET_KEY` mandatory even though an earlier local default is present. This should be simplified in a focused configuration cleanup.
+When Vercel supplies `VERCEL_URL` or `VERCEL_PROJECT_PRODUCTION_URL`, their exact hostnames are accepted automatically for preview/production deployments. The app does not allow all `*.vercel.app` hosts.
 
 ## Common commands
 
@@ -320,6 +360,7 @@ The current `settings.py` assigns `SECRET_KEY` twice. The second assignment make
 |---|---|
 | Install/synchronise dependencies | `uv sync --dev` |
 | Run Django checks | `uv run python manage.py check` |
+| Run deployment checks | `uv run python manage.py check --deploy` |
 | Create migrations | `uv run python manage.py makemigrations` |
 | Apply migrations | `uv run python manage.py migrate` |
 | Create administrator | `uv run python manage.py createsuperuser` |
@@ -353,75 +394,49 @@ The wider `curricula.live` system is expected to grow around entities such as:
 - **Learning path** — an ordered or graph-derived route through concepts;
 - **Evidence / provenance** — where curriculum claims and mappings originated.
 
-These are design directions, not endpoints already implemented in this repository.
+## Deployment
 
-## Suggested API evolution
+The current production target is **Vercel** at `api.curricula.live`, with the frontend deployed independently and PostgreSQL reached through `DATABASE_URL`.
 
-```mermaid
-flowchart LR
-    Foundation[Django foundation\nhealth + admin]
-    Models[Concept and relation models]
-    Admin[Domain-aware admin]
-    ReadAPI[Read API]
-    WriteAPI[Authenticated write API]
-    Graph[Graph traversal and paths]
-    Recommender[Learning recommendations]
+Vercel's Django integration detects `manage.py`, WSGI and Django staticfiles, so this repository intentionally does not carry a legacy Python builder or catch-all routing configuration.
 
-    Foundation --> Models
-    Models --> Admin
-    Models --> ReadAPI
-    ReadAPI --> WriteAPI
-    ReadAPI --> Graph
-    Graph --> Recommender
+Production requires at minimum:
+
+```dotenv
+APP_ENV=production
+DJANGO_SECRET_KEY=<generated secret>
+DJANGO_DEBUG=false
+DJANGO_ALLOWED_HOSTS=api.curricula.live
+DATABASE_URL=<managed PostgreSQL URL>
+DJANGO_CORS_ALLOWED_ORIGINS=https://curricula.live,https://www.curricula.live
+DJANGO_CSRF_TRUSTED_ORIGINS=https://api.curricula.live,https://curricula.live,https://www.curricula.live
 ```
 
-A maintainable sequence would be:
+Production migrations are **not** run automatically on preview deployments. They are a controlled release step so previews cannot mutate a shared production database.
 
-1. Formalise domain terminology and invariants.
-2. Introduce models and migrations.
-3. Expose useful administration workflows.
-4. Add read-only endpoints.
-5. Add authentication and write permissions.
-6. Add graph queries and curriculum mappings.
-7. Add recommendation logic only after source data and evaluation criteria are reliable.
+See [`docs/deployment.md`](docs/deployment.md) for the Vercel project setup, public routing contract, custom-domain/DNS procedure, migration flow, static/admin verification, security settings and migration-away strategy.
 
-## Deployment notes
-
-Before deploying:
-
-- set `DJANGO_DEBUG=false`;
-- generate a unique `DJANGO_SECRET_KEY`;
-- list every deployment hostname in `DJANGO_ALLOWED_HOSTS`;
-- use a TLS-enabled PostgreSQL URL;
-- run migrations as a controlled deployment step;
-- configure static-file handling for the Django admin;
-- add health monitoring for `/health/`;
-- verify CSRF and trusted-origin settings when a browser frontend is connected;
-- run `uv run python manage.py check --deploy`.
-
-Example deployment check:
+CI also runs:
 
 ```bash
 uv run python manage.py check --deploy
 ```
 
+against a production-shaped configuration.
+
 ## Known limitations
 
-- Only health and Django admin routes are currently exposed.
-- Domain models and curriculum endpoints have not yet been implemented.
-- `settings.py` contains a duplicate `SECRET_KEY` assignment.
-- PostgreSQL integration is configured but not covered by the current SQLite test suite.
-- Static-file serving for deployed admin pages is not yet documented in code.
-- API authentication, authorisation and CORS strategy have not yet been introduced.
+- PostgreSQL-specific behaviour is not yet covered by a dedicated integration-test environment.
+- API authentication and write authorization have not yet been introduced.
 - There is no generated OpenAPI schema yet.
-- Deployment configuration is intentionally still minimal.
+- Production deployment still requires account-level Vercel environment variables and custom-domain configuration outside the repository.
 
 ## Contributing
 
 Keep each contribution focused on one logical change. A typical workflow:
 
 ```bash
-git checkout main
+git checkout dev
 git pull
 git checkout -b feat/descriptive-change-name
 uv sync --dev
@@ -439,7 +454,7 @@ Document new environment variables, migrations, dependencies and operational ass
 
 ## Related repositories
 
-The `curricula-live` organisation separates application concerns into focused repositories. This API is expected to work alongside repositories for the web client, canonical data and organisation-level documentation.
+The `curricula-live` organisation separates application concerns into focused repositories. This API works alongside repositories for the web client, canonical data and organisation-level documentation.
 
 ## License
 
