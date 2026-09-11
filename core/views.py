@@ -146,14 +146,14 @@ def _connection_search(variants, limit):
     exact = Q()
     for variant in variants:
         match |= (
-            Q(source_id__icontains=variant)
-            | Q(type_id__icontains=variant)
-            | Q(target_id__icontains=variant)
+            Q(source__slug__icontains=variant)
+            | Q(type__slug__icontains=variant)
+            | Q(target__slug__icontains=variant)
         )
         exact |= (
-            Q(source_id__iexact=variant)
-            | Q(type_id__iexact=variant)
-            | Q(target_id__iexact=variant)
+            Q(source__slug__iexact=variant)
+            | Q(type__slug__iexact=variant)
+            | Q(target__slug__iexact=variant)
         )
 
     relations = (
