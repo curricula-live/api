@@ -8,9 +8,11 @@ from core.views import (
     relation_detail,
     relation_list,
     relation_type_list,
+    search,
 )
 
 urlpatterns = [
+    path("search/", search, name="search"),
     path("concepts/", concept_list, name="concept-list"),
     path("concepts/<str:slug>/", concept_detail, name="concept-detail"),
     path(
