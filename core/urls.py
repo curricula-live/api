@@ -1,5 +1,6 @@
 from django.urls import path
 
+from core.semantic_views import semantic_plan_validate
 from core.views import (
     concept_detail,
     concept_list,
@@ -28,4 +29,5 @@ urlpatterns = [
     path("relations/", relation_list, name="relation-list"),
     path("relations/<uuid:relation_id>/", relation_detail, name="relation-detail"),
     path("relation-types/", relation_type_list, name="relation-type-list"),
+    path("plans/validate/", semantic_plan_validate, name="semantic-plan-validate"),
 ]
