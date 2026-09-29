@@ -424,9 +424,30 @@ uv run python manage.py check --deploy
 
 against a production-shaped configuration.
 
+## Semantic publication prototype
+
+The API includes an additive snapshot-aware planning contract at:
+
+```text
+POST /v1/plans/validate/
+```
+
+Published semantic snapshots are materialised from the current canonical graph with:
+
+```bash
+uv run python manage.py publish_semantic_snapshot K_17
+```
+
+A publication copies concept membership and prerequisite edge semantics into Django-owned append-only tables. Planning validation reads those copies rather than the mutable live `relation` table, so a historical request pinned to `K_17` remains reproducible after `K_18` is published.
+
+The response advertises `contract_version: semantic-api@1` and returns the snapshot hash together with `VALID`, `INVALID`, or `INDETERMINATE` results and deterministic explanation certificates.
+
+The existing graph endpoints remain unchanged. The graph synchronization repository remains the reviewable interchange layer for `concept` and `relation`; semantic publication tables are an API-owned derived publication boundary rather than a second writable source of graph truth.
+
 ## Known limitations
 
 - PostgreSQL-specific behaviour is not yet covered by a dedicated integration-test environment.
+- Semantic snapshot publication currently rejects cycles conservatively across the complete published prerequisite graph. Scope-aware cycle admission is not yet implemented, so mutually exclusive scoped edges may be rejected even when no supported context would activate the full cycle.
 - API authentication and write authorization have not yet been introduced.
 - There is no generated OpenAPI schema yet.
 - Production deployment still requires account-level Vercel environment variables and custom-domain configuration outside the repository.
