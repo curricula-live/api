@@ -249,3 +249,16 @@ def test_plan_validation_is_post_only(client, publication_graph):
     publish_snapshot("K_17")
     response = client.get(reverse("semantic-plan-validate"))
     assert response.status_code == 405
+
+
+def test_plan_validation_is_csrf_exempt_for_machine_consumers(
+    publication_graph, django_user_model
+):
+    from django.test import Client
+
+    publish_snapshot("K_17")
+    csrf_client = Client(enforce_csrf_checks=True)
+    response = validate(csrf_client, "K_17", prior=["C1"], plan=["C2", "C3"])
+
+    assert response.status_code == 200
+    assert response.json()["validation"]["outcome"] == "VALID"
