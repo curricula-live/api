@@ -1,6 +1,7 @@
 import json
 
 from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from core.models import SemanticPublicationSnapshot
@@ -14,6 +15,7 @@ def _problem(code, detail, status):
     )
 
 
+@csrf_exempt
 @require_POST
 def semantic_plan_validate(request):
     try:
