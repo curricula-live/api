@@ -173,3 +173,15 @@ def test_unsafe_email_link_base_fails_closed(client, base):
             response = post(client, "owner-auth-request", {"email": "owner@example.org"}, **HEADERS)
         assert response.status_code == 404
         issue.assert_not_called()
+
+
+@override_settings(**{**FLAGS, "IS_PRODUCTION": True})
+def test_email_http_routes_cannot_be_enabled_in_production_before_security_gates(client):
+    # SMTP request timing and shared-source rate limiting are not production-ready.
+    for name in ("owner-auth-request", "owner-auth-redeem", "owner-auth-logout"):
+        assert post(client, name, {"email": "owner@example.org"}, **HEADERS).status_code == 404
+
+
+@override_settings(**{**FLAGS, "OWNER_LOGIN_LINK_BASE": "http://localhost:badport/login/verify"})
+def test_invalid_link_port_fails_closed(client):
+    assert post(client, "owner-auth-request", {"email": "owner@example.org"}, **HEADERS).status_code == 404
