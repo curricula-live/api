@@ -85,4 +85,4 @@ jobs:
       - name: Verify expected shared schema exists
         run: test -s "$ADMIN_DDL_PATH" && test -s "$ADMIN_OUTBOX_DDL_PATH"
       - name: Run real PostgreSQL owner authorization tests
-        run: uv run pytest --ds=config.settings -q tests/test_owner_auth_postgres.py tests/test_owner_passwordless_postgres.py
+        run: uv run pytest --ds=config.settings -q tests/test_owner_auth_postgres.py tests/test_owner_passwordless_postgres.py tests/test_owner_rate_limit_postgres.py
