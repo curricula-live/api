@@ -1,5 +1,7 @@
 from django.urls import path
 
+from core.owner_auth_views import verify_owner_session
+
 from core.views import (
     concept_detail,
     concept_list,
@@ -12,6 +14,7 @@ from core.views import (
 )
 
 urlpatterns = [
+    path("admin/auth/session/", verify_owner_session, name="owner-auth-session"),
     path("search/", search, name="search"),
     path("concepts/", concept_list, name="concept-list"),
     path("concepts/<str:slug>/", concept_detail, name="concept-detail"),
