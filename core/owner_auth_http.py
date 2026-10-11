@@ -20,6 +20,8 @@ from django.db import DatabaseError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
 
+from core.owner_rate_limit import consume_owner_request_quota
+
 from core.owner_passwordless import (
     issue_challenge,
     normalized_email,
@@ -72,6 +74,8 @@ def _configured() -> bool:
         and len(secret) >= 32
         and isinstance(sender, str)
         and bool(sender.strip())
+        and isinstance(getattr(settings, "OWNER_RATE_LIMIT_KEY", ""), str)
+        and len(getattr(settings, "OWNER_RATE_LIMIT_KEY", "").encode("utf-8")) >= 32
         and _link_destination() is not None
     )
 
@@ -126,7 +130,8 @@ def request_owner_link(request) -> HttpResponse:
     normalized = normalized_email(email)
     if normalized:
         try:
-            issued = issue_challenge(normalized)
+            quota_ok = consume_owner_request_quota(normalized)
+            issued = issue_challenge(normalized) if quota_ok else None
             if issued is not None:
                 link = f"{_link_destination()}#challenge={quote(issued.token, safe='')}"
                 # Do not log the link or raw challenge; send only after commit.
