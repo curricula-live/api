@@ -285,3 +285,65 @@ def test_full_http_async_owner_login_uses_worker_not_request_thread(client):
             reverse("owner-auth-session"),
             HTTP_AUTHORIZATION="Bearer " + bearer,
         ).status_code == 401
+
+
+@override_settings(**CONFIG)
+def test_maintenance_discards_expired_mail_without_sending():
+    from core.owner_mail_maintenance import sweep_owner_mail
+
+    email = setup_owner()
+    now = timezone.now()
+    assert issue_challenge(email, now=now - timedelta(minutes=11), queue_delivery=True)
+    assert sweep_owner_mail(now=now) == (1, 0)
+    assert sweep_owner_mail(now=now) == (0, 0)
+    with patch("core.owner_mail_worker.send_mail") as mail:
+        assert dispatch_one(now=now) == "idle"
+    mail.assert_not_called()
+
+
+@override_settings(**CONFIG)
+def test_maintenance_does_not_clear_an_active_worker_lease():
+    from core.owner_mail_maintenance import sweep_owner_mail
+
+    email = setup_owner()
+    now = timezone.now()
+    assert issue_challenge(email, now=now - timedelta(minutes=9, seconds=40),
+                           queue_delivery=True)
+    lease = claim_next_job(now=now)
+    assert lease is not None
+    # The challenge expires while the worker holds the lease. Cleanup must
+    # defer until the lease expires rather than overwriting its fence.
+    assert sweep_owner_mail(now=now + timedelta(seconds=21)) == (0, 0)
+    assert sweep_owner_mail(now=now + timedelta(seconds=91)) == (1, 0)
+    assert not finalize_job(lease, "delivered", now=now + timedelta(seconds=91))
+
+
+@override_settings(**CONFIG)
+def test_maintenance_discards_crashed_fifth_attempt_and_prunes_old_quotas():
+    from core.owner_mail_maintenance import sweep_owner_mail
+
+    email = setup_owner()
+    now = timezone.now()
+    assert issue_challenge(email, now=now, queue_delivery=True)
+    with connection.cursor() as cursor:
+        cursor.execute("update admin.owner_email_outbox set attempts=5")
+        cursor.execute(
+            "insert into admin.owner_auth_rate_bucket (bucket_key,first_seen_at) "
+            "values (%s,%s),(%s,%s)",
+            ("c" * 64, now - timedelta(days=3), "d" * 64, now),
+        )
+    assert sweep_owner_mail(now=now, batch=1) == (1, 1)
+    assert sweep_owner_mail(now=now, batch=1) == (0, 0)
+    with connection.cursor() as cursor:
+        cursor.execute("select bucket_key from admin.owner_auth_rate_bucket")
+        assert cursor.fetchall() == [("d" * 64,)]
+
+
+@override_settings(**CONFIG)
+def test_owner_mail_cleanup_refuses_production_even_with_feature_flag():
+    from core.owner_mail_maintenance import sweep_owner_mail
+
+    setup_owner()
+    with override_settings(APP_ENV="production", IS_PRODUCTION=True):
+        with pytest.raises(RuntimeError, match="disabled"):
+            sweep_owner_mail()
