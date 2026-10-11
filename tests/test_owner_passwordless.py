@@ -70,7 +70,7 @@ def test_new_challenge_uses_owner_row_lock_and_stores_only_digest():
 
 
 def test_unknown_owner_and_issue_cooldown_do_not_create_secrets():
-    for results in ([(None,)], [(OWNER,), (1,)]):
+    for results in ([None], [(OWNER,), (1,)]):
         cursor = Cursor(results)
         result = run_with_fake_db(
             cursor, lambda: issue_challenge("owner@example.org", now=NOW)
