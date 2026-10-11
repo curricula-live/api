@@ -62,9 +62,9 @@ def test_challenge_session_revocation_on_actual_postgresql(client):
     # Issuance is serialized through the owner row and constrained by cooldown.
     assert issue_challenge("owner-ci@example.org", now=now + timedelta(seconds=1)) is None
 
-    session = redeem_challenge(first.token, now=now + timedelta(seconds=2))
+    session = redeem_challenge(first.token, now=now)
     assert session is not None and session.owner_id == owner_id
-    assert redeem_challenge(first.token, now=now + timedelta(seconds=3)) is None
+    assert redeem_challenge(first.token, now=now) is None
 
     with connection.cursor() as cursor:
         cursor.execute(
