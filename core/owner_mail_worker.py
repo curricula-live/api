@@ -125,6 +125,28 @@ def finalize_job(
             return cursor.rowcount == 1
 
 
+def eligible_for_delivery(job: MailJob, *, now: datetime) -> bool:
+    """Re-check persisted owner/challenge and lease immediately before SMTP.
+
+    This minimizes stale-owner deliveries after a worker has claimed a row.
+    Email sending cannot be made atomic with a database transaction, so this
+    is a best-effort pre-send gate, not a guarantee against concurrent changes.
+    """
+    instant = utc_now(now)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "select 1 from admin.owner_email_outbox o "
+            "join admin.email_challenge c on c.id=o.challenge_id "
+            "join admin.owner_principal p on p.id=c.owner_id "
+            "where o.id=%s and o.lease_token=%s and o.leased_until>%s "
+            "and o.delivered_at is null and o.discarded_at is null "
+            "and o.attempts=%s and c.consumed_at is null "
+            "and c.expires_at>%s and p.active and p.role='owner'",
+            (job.id, job.fence, instant, job.attempts, instant + timedelta(seconds=30)),
+        )
+        return cursor.fetchone() is not None
+
+
 def dispatch_one(*, now: datetime | None = None) -> str:
     """Dispatch at most one job, with sanitized result and no credential logging."""
     if not worker_enabled():
@@ -136,6 +158,9 @@ def dispatch_one(*, now: datetime | None = None) -> str:
     # Refuse to send to inactive owners, used/expired links or rotated keys.
     if (not job.owner_active or job.owner_role != "owner" or
             job.consumed_at is not None or job.expires_at <= instant):
+        finalize_job(job, "discarded", now=instant)
+        return "discarded"
+    if not eligible_for_delivery(job, now=instant):
         finalize_job(job, "discarded", now=instant)
         return "discarded"
     try:
