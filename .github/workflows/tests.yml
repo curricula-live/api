@@ -3,8 +3,8 @@ name: Tests
 on:
   push:
     branches: [main, dev]
+  # Run CI for draft/stacked PRs whose base is another feature branch too.
   pull_request:
-    branches: [main, dev]
 
 permissions:
   contents: read
