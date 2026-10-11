@@ -41,3 +41,21 @@ This is feature work, **not** a production release or authorization to send mail
 ### Fencing compatibility
 
 The worker uses a unique per-claim `lease_token` UUID plus `leased_until` and attempt count when claiming/finalizing work. Stale workers cannot acknowledge a newer lease. PostgreSQL CI pins `data#22` at commit `1aa46b7602bedffd36cc27457d7fa91dd289b54d` (migration with lease-token consistency constraint). API and data queue helpers must be kept in sync during review.
+
+
+## Operational cleanup command
+
+The API also provides `python manage.py maintain_owner_mail --batch 100 --confirm MAINTAIN-STAGING-OWNER-MAIL`.
+It is disabled outside isolated staging, and only operates with the explicit
+asynchronous owner-mail worker flags enabled. The command neither sends mail
+nor reconstructs challenges.
+
+The cleanup uses PostgreSQL transactions and `SKIP LOCKED` to discard
+expired/consumed, owner-disabled, or abandoned fifth-attempt jobs. It **does
+not** clear actively leased rows, even if a challenge expires mid-send.
+Separate bounded pruning removes rate-limit buckets older than 48 hours.
+Both paths have disposable PostgreSQL regression tests.
+
+An actual schedule, metrics/alerting and a reviewed provider deployment
+remain out of scope. SMTP is mocked in CI, and no production or staging
+credential configuration has been performed.
