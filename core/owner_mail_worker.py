@@ -10,7 +10,7 @@ from __future__ import annotations
 import hmac
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from django.conf import settings
 from django.core.mail import send_mail
@@ -35,6 +35,7 @@ class MailJob:
     owner_active: bool
     owner_role: str
     lease_until: datetime
+    fence: UUID
 
 
 def utc_now(value: datetime | None = None) -> datetime:
@@ -63,6 +64,7 @@ def worker_enabled() -> bool:
 def claim_next_job(*, now: datetime | None = None) -> MailJob | None:
     instant = utc_now(now)
     lease_until = instant + LEASE
+    fence = uuid4()
     with transaction.atomic():
         with connection.cursor() as cursor:
             cursor.execute(
@@ -72,23 +74,24 @@ def claim_next_job(*, now: datetime | None = None) -> MailJob | None:
                 "join admin.email_challenge c on c.id=o.challenge_id "
                 "join admin.owner_principal p on p.id=c.owner_id "
                 "where o.delivered_at is null and o.discarded_at is null "
-                "and o.available_at<=%s and (o.leased_until is null or o.leased_until<=%s) "
+                "and o.available_at<=%s and o.attempts<%s " 
+                "and (o.leased_until is null or o.leased_until<=%s) "
                 "order by o.available_at,o.id for update of o skip locked limit 1",
-                (instant, instant),
+                (instant, MAX_ATTEMPTS, instant),
             )
             row = cursor.fetchone()
             if row is None:
                 return None
             cursor.execute(
                 "update admin.owner_email_outbox "
-                "set attempts=attempts+1,leased_until=%s where id=%s",
-                (lease_until, row[0]),
+                "set attempts=attempts+1,leased_until=%s,lease_token=%s where id=%s",
+                (lease_until, fence, row[0]),
             )
             return MailJob(
                 id=row[0], challenge_id=row[1], attempts=row[2] + 1,
                 token_hash=row[3], expires_at=row[4], consumed_at=row[5],
                 email=row[6], owner_active=row[7], owner_role=row[8],
-                lease_until=lease_until,
+                lease_until=lease_until, fence=fence,
             )
 
 
@@ -106,17 +109,18 @@ def finalize_job(
     else:
         retry_at = instant
     assignments = {
-        "delivered": ("delivered_at=%s,leased_until=null", [instant]),
-        "discarded": ("discarded_at=%s,leased_until=null", [instant]),
-        "retry": ("available_at=%s,leased_until=null", [retry_at]),
+        "delivered": ("delivered_at=%s,leased_until=null,lease_token=null", [instant]),
+        "discarded": ("discarded_at=%s,leased_until=null,lease_token=null", [instant]),
+        "retry": ("available_at=%s,leased_until=null,lease_token=null", [retry_at]),
     }
     update, args = assignments[result]
     with transaction.atomic():
         with connection.cursor() as cursor:
             cursor.execute(
                 "update admin.owner_email_outbox set " + update +
-                " where id=%s and leased_until=%s and delivered_at is null and discarded_at is null",
-                (*args, job.id, job.lease_until),
+                " where id=%s and lease_token=%s and leased_until>%s " 
+                "and attempts=%s and delivered_at is null and discarded_at is null",
+                (*args, job.id, job.fence, instant, job.attempts),
             )
             return cursor.rowcount == 1
 

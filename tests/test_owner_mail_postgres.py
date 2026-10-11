@@ -14,7 +14,7 @@ from django.test import override_settings
 from django.utils import timezone
 
 from core.owner_mail_crypto import derive_owner_email_token
-from core.owner_mail_worker import dispatch_one, worker_enabled
+from core.owner_mail_worker import dispatch_one, worker_enabled, claim_next_job, finalize_job
 from core.owner_passwordless import issue_challenge, redeem_challenge
 from core.owner_session_contract import fingerprint_token
 
@@ -140,3 +140,18 @@ def test_worker_is_denied_outside_isolated_staging():
             dispatch_one()
     with override_settings(OWNER_EMAIL_WORKER_ENABLED=False):
         assert not worker_enabled()
+
+
+@override_settings(**CONFIG)
+def test_fencing_token_prevents_stale_worker_finalization():
+    email = setup_owner()
+    now = timezone.now()
+    assert issue_challenge(email, now=now, queue_delivery=True) is not None
+    older = claim_next_job(now=now + timedelta(seconds=1))
+    assert older is not None
+    newer = claim_next_job(now=now + timedelta(seconds=93))
+    assert newer is not None
+    assert newer.id == older.id and newer.fence != older.fence
+    assert newer.attempts == older.attempts + 1
+    assert not finalize_job(older, "delivered", now=now + timedelta(seconds=93))
+    assert finalize_job(newer, "delivered", now=now + timedelta(seconds=93))
