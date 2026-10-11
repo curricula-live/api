@@ -37,22 +37,23 @@ def _link_destination() -> str | None:
         return None
     try:
         url = urlsplit(configured)
+        if url.username or url.password or url.query or url.fragment:
+            return None
+        production = (
+            url.scheme == "https"
+            and url.netloc == "admin.curricula.live"
+            and url.path == "/login/verify"
+        )
+        local = (
+            not settings.IS_PRODUCTION
+            and url.scheme == "http"
+            and url.hostname in ("localhost", "127.0.0.1")
+            and url.port == 3000
+            and url.path == "/login/verify"
+        )
     except ValueError:
+        # Invalid TCP port, malformed URL or URL-split credentials fail closed.
         return None
-    if url.username or url.password or url.query or url.fragment:
-        return None
-    production = (
-        url.scheme == "https"
-        and url.netloc == "admin.curricula.live"
-        and url.path == "/login/verify"
-    )
-    local = (
-        not settings.IS_PRODUCTION
-        and url.scheme == "http"
-        and url.hostname in ("localhost", "127.0.0.1")
-        and url.port == 3000
-        and url.path == "/login/verify"
-    )
     if not (production or local):
         return None
     return configured
@@ -62,7 +63,10 @@ def _configured() -> bool:
     secret = getattr(settings, "OWNER_BFF_SHARED_SECRET", "")
     sender = getattr(settings, "OWNER_LOGIN_SENDER", "")
     return (
-        getattr(settings, "OWNER_AUTH_ENABLED", False)
+        # Production requires a shared rate limiter and asynchronous email
+        # delivery to avoid enumeration through SMTP response timing.
+        not settings.IS_PRODUCTION
+        and getattr(settings, "OWNER_AUTH_ENABLED", False)
         and getattr(settings, "OWNER_AUTH_HTTP_ENABLED", False)
         and isinstance(secret, str)
         and len(secret) >= 32
@@ -135,7 +139,7 @@ def request_owner_link(request) -> HttpResponse:
                     [normalized],
                     fail_silently=False,
                 )
-        except (DatabaseError, Exception):
+        except Exception:
             # A uniform response also avoids leaking owner membership and
             # provider failures. Operational alerting is a separate requirement.
             pass
