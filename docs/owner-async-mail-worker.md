@@ -1,0 +1,61 @@
+# Owner passwordless mail outbox — staging-only implementation
+
+Depends on **data#22** (operational PostgreSQL migration 0003) and **api#53** (durable request throttling). Both dependencies are now merged into their respective `dev` branches. This PR targets `api/dev` for review and must not be independently deployed. No auth feature, SMTP credential or owner migration has been activated.
+
+## Secret-free durable queue
+
+- The HTTP challenge is issued in a database transaction with an outbox record tied to a random UUID. PostgreSQL stores **only** the challenge's purpose-separated digest and the UUID, never the raw bearer or complete email link.
+- The worker derives a URL-safe 256-bit opaque challenge token with a *separate* private HMAC key (`OWNER_EMAIL_TOKEN_KEY`). The derivation binds the key to the UUID and a domain-separation label. The recovered token's digest MUST match the persisted challenge digest before mailing.
+- Rotating/removing that key invalidates old undelivered items; mismatched entries are discarded. Rotation requires planning so pending emails aren't lost.
+- A worker row is leased using `FOR UPDATE OF o SKIP LOCKED` and a 90-second lease. Sending occurs **outside** the transaction. Expired, already-used, inactive-owner and key-mismatched entries are discarded.
+- Failures result in a bounded exponential retry, at most five tries and never beyond challenge expiry. Only the holder of the current lease can finalize the row. At-least-once delivery may create duplicate email messages; *redemption remains one-use*.
+- No exception text, email address, challenge token, message content, or SMTP error is printed by the dispatcher. Operational metrics and alerting remain a release requirement.
+
+## Explicit staging-only execution
+
+The Django management command is `python manage.py dispatch_owner_mail --limit 5 --confirm SEND-STAGING-OWNER-MAIL`.
+
+It refuses to run unless all conditions hold:
+- `APP_ENV=staging` and `IS_PRODUCTION=False`
+- `OWNER_ASYNC_MAIL_ENABLED=true`
+- `OWNER_EMAIL_WORKER_ENABLED=true`
+- `OWNER_EMAIL_TOKEN_KEY` is an independent **random** secret of at least 32 bytes
+- `OWNER_LOGIN_SENDER` is set, and the link target passes the existing strict allowlist
+- `EMAIL_TIMEOUT` is positive and at most 15 seconds
+
+The HTTP route still requires its separate BFF, rate-limit and owner-auth flags, and is **hard-blocked in production**. The staging worker does not launch automatically or on a schedule. No staging or production database changes were made when the code was committed.
+
+## Validation
+
+Unit tests prove HMAC derivation stability, purpose separation and weak-key refusal. Disposable PostgreSQL integration tests exercise challenge+outbox atomic creation, recoverability without plaintext DB storage, mocked SMTP delivery, retry/backoff, expiry, key rotation and one-use redemption.
+
+Remaining release gates:
+1. Rehearse the merged data-owned migration on isolated staging PostgreSQL, then validate the coordinated API/admin integration without production activation.
+2. Validate against a real staging deployment and an approved email provider using test recipient/sender, with message delivery and failure telemetry.
+3. Review an actual bounded worker/cleanup schedule and operations: key rotation/recovery, privileged worker isolation, provider credentials, sender/domain verification, failure telemetry and rate-limit monitoring. Staging-only cleanup code already exists but is not scheduled.
+4. Perform neutral-response timing analysis and shared source/IP throttling before any production activation.
+5. Review cross-repository BFF cookies, CSRF, external TLS and API authorization end-to-end.
+
+This is feature work, **not** a production release or authorization to send mail.
+
+### Fencing compatibility
+
+The worker uses a unique per-claim `lease_token` UUID plus `leased_until` and attempt count when claiming/finalizing work. Stale workers cannot acknowledge a newer lease. PostgreSQL CI pins `data#22` at commit `1aa46b7602bedffd36cc27457d7fa91dd289b54d` (migration with lease-token consistency constraint). API and data queue helpers must be kept in sync during review.
+
+
+## Operational cleanup command
+
+The API also provides `python manage.py maintain_owner_mail --batch 100 --confirm MAINTAIN-STAGING-OWNER-MAIL`.
+It is disabled outside isolated staging, and only operates with the explicit
+asynchronous owner-mail worker flags enabled. The command neither sends mail
+nor reconstructs challenges.
+
+The cleanup uses PostgreSQL transactions and `SKIP LOCKED` to discard
+expired/consumed, owner-disabled, or abandoned fifth-attempt jobs. It **does
+not** clear actively leased rows, even if a challenge expires mid-send.
+Separate bounded pruning removes rate-limit buckets older than 48 hours.
+Both paths have disposable PostgreSQL regression tests.
+
+An actual schedule, metrics/alerting and a reviewed provider deployment
+remain out of scope. SMTP is mocked in CI, and no production or staging
+credential configuration has been performed.

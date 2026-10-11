@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 from django.db import connection, transaction
 
 from core.owner_session_contract import fingerprint_token, issue_opaque_token
+from core.owner_mail_crypto import derive_owner_email_token
 
 CHALLENGE_TTL = timedelta(minutes=10)
 ISSUE_COOLDOWN = timedelta(minutes=1)
@@ -49,7 +50,7 @@ def utc_now(value: datetime | None) -> datetime:
     return result.astimezone(timezone.utc)
 
 
-def issue_challenge(email: str, *, now: datetime | None = None) -> IssuedChallenge | None:
+def issue_challenge(email: str, *, now: datetime | None = None, queue_delivery: bool = False) -> IssuedChallenge | None:
     """Return a new challenge only for the provisioned active owner.
 
     The HTTP layer must never reveal whether an email matched, and must send
@@ -77,14 +78,22 @@ def issue_challenge(email: str, *, now: datetime | None = None) -> IssuedChallen
             )
             if cursor.fetchone() is not None:
                 return None
-            token = issue_opaque_token()
+            # Derivable only with the private mail key; no bearer/token in the DB.
+            challenge_id = uuid4()
+            token = derive_owner_email_token(challenge_id) if queue_delivery else issue_opaque_token()
             expires = instant + CHALLENGE_TTL
             cursor.execute(
                 "insert into admin.email_challenge "
                 "(id,owner_id,token_hash,issued_at,expires_at) "
                 "values (%s,%s,%s,%s,%s)",
-                (uuid4(), owner_id, fingerprint_token(token, "challenge"), instant, expires),
+                (challenge_id, owner_id, fingerprint_token(token, "challenge"), instant, expires),
             )
+            if queue_delivery:
+                # Both records are committed atomically; worker sees no partial job.
+                cursor.execute(
+                    "insert into admin.owner_email_outbox (id,challenge_id) values (%s,%s)",
+                    (uuid4(), challenge_id),
+                )
             cursor.execute(
                 "insert into admin.owner_audit (owner_id,event_type) "
                 "values (%s,'challenge_issued')",
