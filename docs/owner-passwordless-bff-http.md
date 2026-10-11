@@ -59,3 +59,16 @@ cache, replay, cookie scope, account deactivation and session revocation.
 
 **This PR is a contract for code review, not authorization to enable the
 feature in production or connect production email credentials.**
+
+## Current production safety block
+
+`_configured()` explicitly returns false under `APP_ENV=production`,
+regardless of environment flags. This is intentional while delivery runs
+synchronously in the request path: SMTP/network timing can reveal whether an
+owner email address exists even if the HTTP response body is neutral.
+Production enablement requires a reviewed transactional outbox/worker or
+equivalent asynchronous delivery and durable shared-source rate limiting,
+followed by a new security review and explicit removal of this block.
+
+The proof-of-contract integration tests run only against disposable PostgreSQL
+with a mocked email provider; they do not validate real delivery.
