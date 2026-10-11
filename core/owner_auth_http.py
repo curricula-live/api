@@ -19,6 +19,7 @@ from django.core.mail import send_mail
 from django.db import DatabaseError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
 
 from core.owner_rate_limit import consume_owner_request_quota
 
@@ -122,6 +123,7 @@ def _body(request) -> dict | None:
     return value if isinstance(value, dict) else None
 
 
+@csrf_exempt
 @require_POST
 def request_owner_link(request) -> HttpResponse:
     denied = _guard(request)
@@ -164,6 +166,7 @@ def request_owner_link(request) -> HttpResponse:
     return _json(NEUTRAL, status=202)
 
 
+@csrf_exempt
 @require_POST
 def redeem_owner_link(request) -> HttpResponse:
     denied = _guard(request)
@@ -188,6 +191,7 @@ def redeem_owner_link(request) -> HttpResponse:
     )
 
 
+@csrf_exempt
 @require_POST
 def logout_owner_session(request) -> HttpResponse:
     denied = _guard(request)
