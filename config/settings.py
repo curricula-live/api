@@ -32,6 +32,7 @@ OWNER_AUTH_HTTP_ENABLED = env.bool("OWNER_AUTH_HTTP_ENABLED", default=False)
 OWNER_BFF_SHARED_SECRET = env("OWNER_BFF_SHARED_SECRET", default="")
 OWNER_LOGIN_LINK_BASE = env("OWNER_LOGIN_LINK_BASE", default="")
 OWNER_LOGIN_SENDER = env("OWNER_LOGIN_SENDER", default="")
+OWNER_RATE_LIMIT_KEY = env("OWNER_RATE_LIMIT_KEY", default="")
 
 # Keep the secret explicit in every environment. The example .env documents a
 # local-only value; deployed secrets belong in the hosting provider.
