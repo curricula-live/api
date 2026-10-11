@@ -195,6 +195,29 @@ def isolate_rate_limiter_in_http_unit_tests():
         yield
 
 
+@override_settings(**FLAGS)
+def test_throttled_address_is_neutral_and_never_issues_or_sends(client):
+    with (
+        patch("core.owner_auth_http.consume_owner_request_quota", return_value=False) as quota,
+        patch("core.owner_auth_http.issue_challenge") as issued,
+        patch("core.owner_auth_http.send_mail") as mailed,
+    ):
+        denied = post(client, "owner-auth-request", {"email": "owner@example.org"}, **HEADERS)
+    assert denied.status_code == 202
+    assert denied.json() == {"message": "If an eligible account exists, a sign-in email will be sent."}
+    assert denied["Cache-Control"] == "private, no-store"
+    quota.assert_called_once_with("owner@example.org")
+    issued.assert_not_called()
+    mailed.assert_not_called()
+
+
+@override_settings(**{**FLAGS, "OWNER_RATE_LIMIT_KEY": "weak"})
+def test_weak_rate_limit_secret_fails_closed(client):
+    with patch("core.owner_auth_http.issue_challenge") as issued:
+        denied = post(client, "owner-auth-request", {"email": "owner@example.org"}, **HEADERS)
+    assert denied.status_code == 404
+    issued.assert_not_called()
+
 @override_settings(**{**FLAGS, "OWNER_ASYNC_MAIL_ENABLED": True,
                       "OWNER_EMAIL_TOKEN_KEY": "isolated-ci-owner-derivation-key-more-than-32"})
 def test_async_challenge_request_enqueues_without_synchronous_mail(client):

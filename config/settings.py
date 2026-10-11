@@ -24,6 +24,9 @@ environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 APP_ENV = env("APP_ENV", default="development")
 IS_PRODUCTION = APP_ENV.lower() == "production"
 
+# Preview is development/staging-only. Never enable from production config.
+V2_READ_PREVIEW_ENABLED = env.bool("V2_READ_PREVIEW_ENABLED", default=False) and not IS_PRODUCTION
+
 # Owner verification must be explicitly enabled after the data-owned admin
 # schema and owner principal are provisioned. Defaults to fail-closed.
 OWNER_AUTH_ENABLED = env.bool("OWNER_AUTH_ENABLED", default=False)
