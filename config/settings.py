@@ -41,6 +41,14 @@ OWNER_ASYNC_MAIL_ENABLED = env.bool("OWNER_ASYNC_MAIL_ENABLED", default=False)
 OWNER_EMAIL_WORKER_ENABLED = env.bool("OWNER_EMAIL_WORKER_ENABLED", default=False)
 OWNER_EMAIL_TOKEN_KEY = env("OWNER_EMAIL_TOKEN_KEY", default="")
 EMAIL_TIMEOUT = env.int("OWNER_EMAIL_SMTP_TIMEOUT_SECONDS", default=10)
+# Explicit email backend configuration for isolated staging-provider tests.
+# File-based delivery is only used when specifically selected for disposable CI;
+# the default remains Django SMTP. Do not point this at a production mail store.
+EMAIL_BACKEND = env("DJANGO_EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")
+EMAIL_FILE_PATH = env("DJANGO_EMAIL_FILE_PATH", default="")
+EMAIL_HOST = env("DJANGO_EMAIL_HOST", default="localhost")
+EMAIL_PORT = env.int("DJANGO_EMAIL_PORT", default=25)
+
 
 # Keep the secret explicit in every environment. The example .env documents a
 # local-only value; deployed secrets belong in the hosting provider.
