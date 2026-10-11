@@ -217,3 +217,71 @@ def test_worker_discards_challenge_with_less_than_thirty_seconds_left():
     with patch("core.owner_mail_worker.send_mail") as mail:
         assert dispatch_one(now=now) == "discarded"
     mail.assert_not_called()
+
+
+@override_settings(**CONFIG)
+def test_full_http_async_owner_login_uses_worker_not_request_thread(client):
+    """Request -> PostgreSQL outbox -> mail worker -> redeem -> revoke."""
+    import json
+    from django.urls import reverse
+
+    email = setup_owner()
+    machine_key = "isolated-staging-bff-key-for-postgres-contract"
+    headers = {"HTTP_X_ADMIN_BFF_SECRET": machine_key}
+    with override_settings(
+        OWNER_AUTH_ENABLED=True,
+        OWNER_AUTH_HTTP_ENABLED=True,
+        OWNER_BFF_SHARED_SECRET=machine_key,
+        OWNER_RATE_LIMIT_KEY="independent-staging-quota-key-at-least-32-characters",
+    ):
+        with patch("core.owner_auth_http.send_mail") as forbidden_inline:
+            request = client.post(
+                reverse("owner-auth-request"),
+                data=json.dumps({"email": email}),
+                content_type="application/json",
+                **headers,
+            )
+        assert request.status_code == 202
+        assert "challenge" not in request.content.decode()
+        forbidden_inline.assert_not_called()
+
+        with connection.cursor() as cursor:
+            cursor.execute("select count(*) from admin.owner_email_outbox")
+            assert cursor.fetchone()[0] == 1
+
+        with patch("core.owner_mail_worker.send_mail", return_value=1) as delivery:
+            assert dispatch_one() == "delivered"
+        assert delivery.call_count == 1
+        link = delivery.call_args.args[1]
+        token = link.split("#challenge=", 1)[1].splitlines()[0]
+
+        redeemed = client.post(
+            reverse("owner-auth-redeem"),
+            data=json.dumps({"challenge": token}),
+            content_type="application/json",
+            **headers,
+        )
+        assert redeemed.status_code == 200
+        bearer = redeemed.json()["session_token"]
+        assert bearer not in str(request.content)
+        assert client.post(
+            reverse("owner-auth-redeem"),
+            data=json.dumps({"challenge": token}),
+            content_type="application/json",
+            **headers,
+        ).status_code == 401
+        assert client.get(
+            reverse("owner-auth-session"),
+            HTTP_AUTHORIZATION="Bearer " + bearer,
+        ).status_code == 200
+        assert client.post(
+            reverse("owner-auth-logout"),
+            data=json.dumps({}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer " + bearer,
+            **headers,
+        ).status_code == 204
+        assert client.get(
+            reverse("owner-auth-session"),
+            HTTP_AUTHORIZATION="Bearer " + bearer,
+        ).status_code == 401
