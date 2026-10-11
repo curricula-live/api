@@ -76,6 +76,13 @@ def _configured() -> bool:
         and bool(sender.strip())
         and isinstance(getattr(settings, "OWNER_RATE_LIMIT_KEY", ""), str)
         and len(getattr(settings, "OWNER_RATE_LIMIT_KEY", "").encode("utf-8")) >= 32
+        and (
+            not getattr(settings, "OWNER_ASYNC_MAIL_ENABLED", False)
+            or (
+                isinstance(getattr(settings, "OWNER_EMAIL_TOKEN_KEY", ""), str)
+                and len(getattr(settings, "OWNER_EMAIL_TOKEN_KEY", "").encode("utf-8")) >= 32
+            )
+        )
         and _link_destination() is not None
     )
 
@@ -131,8 +138,14 @@ def request_owner_link(request) -> HttpResponse:
     if normalized:
         try:
             quota_ok = consume_owner_request_quota(normalized)
-            issued = issue_challenge(normalized) if quota_ok else None
-            if issued is not None:
+            queued = getattr(settings, "OWNER_ASYNC_MAIL_ENABLED", False) is True
+            if queued:
+                # Persist the challenge and outbox ticket in one transaction.
+                # No network/email operation runs on this HTTP request.
+                issued = issue_challenge(normalized, queue_delivery=True) if quota_ok else None
+            else:
+                issued = issue_challenge(normalized) if quota_ok else None
+            if issued is not None and not queued:
                 link = f"{_link_destination()}#challenge={quote(issued.token, safe='')}"
                 # Do not log the link or raw challenge; send only after commit.
                 send_mail(

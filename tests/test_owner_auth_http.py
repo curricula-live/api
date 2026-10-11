@@ -193,3 +193,29 @@ def isolate_rate_limiter_in_http_unit_tests():
     # Real database quota behavior is exercised by the PostgreSQL integration job.
     with patch("core.owner_auth_http.consume_owner_request_quota", return_value=True):
         yield
+
+
+@override_settings(**{**FLAGS, "OWNER_ASYNC_MAIL_ENABLED": True,
+                      "OWNER_EMAIL_TOKEN_KEY": "isolated-ci-owner-derivation-key-more-than-32"})
+def test_async_challenge_request_enqueues_without_synchronous_mail(client):
+    with (
+        patch("core.owner_auth_http.issue_challenge",
+              return_value=IssuedChallenge(CHALLENGE, NOW)) as issue,
+        patch("core.owner_auth_http.send_mail") as send,
+    ):
+        response = post(client, "owner-auth-request",
+                        {"email": "owner@example.org"}, **HEADERS)
+    assert response.status_code == 202
+    assert CHALLENGE not in response.content.decode()
+    issue.assert_called_once_with("owner@example.org", queue_delivery=True)
+    send.assert_not_called()
+
+
+@override_settings(**{**FLAGS, "OWNER_ASYNC_MAIL_ENABLED": True,
+                      "OWNER_EMAIL_TOKEN_KEY": "weak"})
+def test_async_delivery_key_must_be_configured_before_request(client):
+    with patch("core.owner_auth_http.issue_challenge") as issue:
+        result = post(client, "owner-auth-request",
+                      {"email": "owner@example.org"}, **HEADERS)
+    assert result.status_code == 404
+    issue.assert_not_called()
