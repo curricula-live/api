@@ -107,3 +107,87 @@ def test_challenge_session_revocation_on_actual_postgresql(client):
     with connection.cursor() as cursor:
         cursor.execute("select count(*) from admin.owner_session where owner_id=%s", (owner_id,))
         assert cursor.fetchone()[0] == 1
+
+
+def test_post_only_bff_email_exchange_with_real_postgres(client):
+    """HTTP challenge + explicit redemption + verification + logout, no SMTP."""
+    import json
+    from unittest.mock import patch
+
+    _schema()
+    identity = uuid4()
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "insert into admin.owner_principal (id,email,role,active) "
+            "values (%s,%s,'owner',true)",
+            (identity, "owner-end-to-end@example.org"),
+        )
+
+    opts = {
+        "OWNER_AUTH_ENABLED": True,
+        "OWNER_AUTH_HTTP_ENABLED": True,
+        "OWNER_BFF_SHARED_SECRET": "disposable-test-only-bff-key-at-least-32-bytes",
+        "OWNER_LOGIN_LINK_BASE": "https://admin.curricula.live/login/verify",
+        "OWNER_LOGIN_SENDER": "no-reply@curricula.live",
+        "IS_PRODUCTION": False,
+    }
+    machine_header = {"HTTP_X_ADMIN_BFF_SECRET": opts["OWNER_BFF_SHARED_SECRET"]}
+
+    with override_settings(**opts):
+        with patch("core.owner_auth_http.send_mail", return_value=1) as send:
+            response = client.post(
+                reverse("owner-auth-request"),
+                data=json.dumps({"email": "owner-end-to-end@example.org"}),
+                content_type="application/json",
+                **machine_header,
+            )
+        assert response.status_code == 202
+        assert "session_token" not in response.content.decode()
+        assert send.call_count == 1
+        email_body = send.call_args.args[1]
+        assert "#challenge=" in email_body
+        challenge = email_body.split("#challenge=", 1)[1].splitlines()[0]
+        assert len(challenge) >= 32
+
+        # Link-preview GET cannot redeem it; POST is a deliberate user action.
+        assert client.get(reverse("owner-auth-redeem"), **machine_header).status_code == 405
+
+        redemption = client.post(
+            reverse("owner-auth-redeem"),
+            data=json.dumps({"challenge": challenge}),
+            content_type="application/json",
+            **machine_header,
+        )
+        assert redemption.status_code == 200
+        bearer = redemption.json()["session_token"]
+        assert challenge != bearer
+        assert "Cache-Control" in redemption.headers
+        assert redemption["Cache-Control"] == "private, no-store"
+
+        replay = client.post(
+            reverse("owner-auth-redeem"),
+            data=json.dumps({"challenge": challenge}),
+            content_type="application/json",
+            **machine_header,
+        )
+        assert replay.status_code == 401
+
+        authorized = client.get(
+            reverse("owner-auth-session"),
+            HTTP_AUTHORIZATION=f"Bearer {bearer}",
+        )
+        assert authorized.status_code == 200
+        assert authorized.json()["subject_id"] == str(identity)
+
+        out = client.post(
+            reverse("owner-auth-logout"),
+            data=json.dumps({}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {bearer}",
+            **machine_header,
+        )
+        assert out.status_code == 204
+        assert client.get(
+            reverse("owner-auth-session"),
+            HTTP_AUTHORIZATION=f"Bearer {bearer}",
+        ).status_code == 401
