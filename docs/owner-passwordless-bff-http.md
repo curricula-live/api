@@ -72,3 +72,29 @@ followed by a new security review and explicit removal of this block.
 
 The proof-of-contract integration tests run only against disposable PostgreSQL
 with a mocked email provider; they do not validate real delivery.
+
+
+## Trusted BFF machine request / CSRF behavior
+
+Django's `CsrfViewMiddleware` normally requires browser CSRF tokens for
+POST requests. The Next.js BFF does **not** carry Django session cookies or
+CSRF tokens to Django. Instead, it authenticates to the three owner POST
+routes using the private server-only `X-Admin-BFF-Secret` header.
+
+The routes now explicitly use `csrf_exempt` for this **machine-to-machine
+boundary only**. The endpoint's own guard still rejects absent/incorrect
+shared secrets and any browser `Origin` or `Sec-Fetch-Site` header.
+A browser must use the admin's same-origin Next.js BFF, which checks Origin
+and fetch metadata independently. All production owner POST routes are
+still hard-disabled.
+
+`tests/test_owner_bff_csrf.py` uses
+`Client(enforce_csrf_checks=True)` to prove that private BFF requests
+work and missing credentials, browser requests and production attempts are
+denied. Cross-repository admin CI also exercises the real Django HTTP
+server, PostgreSQL, Next.js BFF, outbox and file-based test mail delivery.
+
+For disposable mail integration CI only, set `DJANGO_EMAIL_BACKEND`
+to Django's filesystem email backend and set `DJANGO_EMAIL_FILE_PATH`
+to an isolated temporary directory. These are not deployment instructions
+for actual mail delivery, and do not authorize production authentication.
