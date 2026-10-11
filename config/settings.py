@@ -24,6 +24,9 @@ environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 APP_ENV = env("APP_ENV", default="development")
 IS_PRODUCTION = APP_ENV.lower() == "production"
 
+# Preview is development/staging-only. Never enable from production config.
+V2_READ_PREVIEW_ENABLED = env.bool("V2_READ_PREVIEW_ENABLED", default=False) and not IS_PRODUCTION
+
 # Keep the secret explicit in every environment. The example .env documents a
 # local-only value; deployed secrets belong in the hosting provider.
 SECRET_KEY = env("DJANGO_SECRET_KEY")
