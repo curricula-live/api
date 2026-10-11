@@ -27,6 +27,7 @@ FLAGS = dict(
     OWNER_BFF_SHARED_SECRET=SECRET,
     OWNER_LOGIN_LINK_BASE="https://admin.curricula.live/login/verify",
     OWNER_LOGIN_SENDER="no-reply@curricula.live",
+    OWNER_RATE_LIMIT_KEY="isolated-ci-only-owner-rate-key-more-than-32",
     IS_PRODUCTION=False,
 )
 
@@ -185,3 +186,10 @@ def test_email_http_routes_cannot_be_enabled_in_production_before_security_gates
 @override_settings(**{**FLAGS, "OWNER_LOGIN_LINK_BASE": "http://localhost:badport/login/verify"})
 def test_invalid_link_port_fails_closed(client):
     assert post(client, "owner-auth-request", {"email": "owner@example.org"}, **HEADERS).status_code == 404
+
+
+@pytest.fixture(autouse=True)
+def isolate_rate_limiter_in_http_unit_tests():
+    # Real database quota behavior is exercised by the PostgreSQL integration job.
+    with patch("core.owner_auth_http.consume_owner_request_quota", return_value=True):
+        yield
