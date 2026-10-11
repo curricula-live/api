@@ -155,3 +155,65 @@ def test_fencing_token_prevents_stale_worker_finalization():
     assert newer.attempts == older.attempts + 1
     assert not finalize_job(older, "delivered", now=now + timedelta(seconds=93))
     assert finalize_job(newer, "delivered", now=now + timedelta(seconds=93))
+
+
+@override_settings(**CONFIG)
+def test_owner_disabled_between_claim_and_send_does_not_receive_mail():
+    email = setup_owner()
+    now = timezone.now()
+    assert issue_challenge(email, now=now, queue_delivery=True) is not None
+    original_claim = claim_next_job
+
+    def disable_after_claim(*, now):
+        job = original_claim(now=now)
+        assert job is not None
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "update admin.owner_principal set active=false,disabled_at=%s "
+                "where email=%s",
+                (now, email),
+            )
+        return job
+
+    with (
+        patch("core.owner_mail_worker.claim_next_job", side_effect=disable_after_claim),
+        patch("core.owner_mail_worker.send_mail") as mail,
+    ):
+        assert dispatch_one(now=now + timedelta(seconds=1)) == "discarded"
+    mail.assert_not_called()
+
+
+@override_settings(**CONFIG)
+def test_challenge_consumed_between_claim_and_send_does_not_receive_mail():
+    email = setup_owner()
+    now = timezone.now()
+    assert issue_challenge(email, now=now, queue_delivery=True) is not None
+    original_claim = claim_next_job
+
+    def consume_after_claim(*, now):
+        job = original_claim(now=now)
+        assert job is not None
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "update admin.email_challenge set consumed_at=%s where id=%s",
+                (now, job.challenge_id),
+            )
+        return job
+
+    with (
+        patch("core.owner_mail_worker.claim_next_job", side_effect=consume_after_claim),
+        patch("core.owner_mail_worker.send_mail") as mail,
+    ):
+        assert dispatch_one(now=now + timedelta(seconds=1)) == "discarded"
+    mail.assert_not_called()
+
+
+@override_settings(**CONFIG)
+def test_worker_discards_challenge_with_less_than_thirty_seconds_left():
+    email = setup_owner()
+    now = timezone.now()
+    issue_at = now - timedelta(minutes=9, seconds=45)
+    assert issue_challenge(email, now=issue_at, queue_delivery=True) is not None
+    with patch("core.owner_mail_worker.send_mail") as mail:
+        assert dispatch_one(now=now) == "discarded"
+    mail.assert_not_called()
