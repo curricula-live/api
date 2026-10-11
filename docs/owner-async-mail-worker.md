@@ -40,4 +40,4 @@ This is feature work, **not** a production release or authorization to send mail
 
 ### Fencing compatibility
 
-The worker uses a unique per-claim `lease_token` UUID plus `leased_until` and attempt count when claiming/finalizing work. Stale workers cannot acknowledge a newer lease. PostgreSQL CI pins `data#22` at commit `8d1003a80b55058574cded1c0e3f24ab4d1be165` (migration with lease-token consistency constraint). API and data queue helpers must be kept in sync during review.
+The worker uses a unique per-claim `lease_token` UUID plus `leased_until` and attempt count when claiming/finalizing work. Stale workers cannot acknowledge a newer lease. PostgreSQL CI pins `data#22` at commit `1aa46b7602bedffd36cc27457d7fa91dd289b54d` (migration with lease-token consistency constraint). API and data queue helpers must be kept in sync during review.
