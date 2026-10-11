@@ -19,6 +19,7 @@ from core.owner_passwordless import issue_challenge, redeem_challenge, revoke_se
 from core.owner_session_contract import fingerprint_token
 
 SCHEMA_PATH = os.environ.get("ADMIN_DDL_PATH")
+OUTBOX_PATH = os.environ.get("ADMIN_OUTBOX_DDL_PATH")
 pytestmark = [
     pytest.mark.django_db,
     pytest.mark.skipif(not SCHEMA_PATH, reason="requires isolated PostgreSQL schema CI job"),
@@ -28,9 +29,12 @@ pytestmark = [
 def _schema():
     assert connection.vendor == "postgresql"
     with connection.cursor() as cursor:
-        for statement in sqlparse.split(Path(SCHEMA_PATH).read_text(encoding="utf-8")):
-            if statement.strip():
-                cursor.execute(statement)
+        for file in (SCHEMA_PATH, OUTBOX_PATH):
+            if not file:
+                continue
+            for statement in sqlparse.split(Path(file).read_text(encoding="utf-8")):
+                if statement.strip():
+                    cursor.execute(statement)
 
 
 def test_challenge_session_revocation_on_actual_postgresql(client):
@@ -129,6 +133,7 @@ def test_post_only_bff_email_exchange_with_real_postgres(client):
         "OWNER_BFF_SHARED_SECRET": "disposable-test-only-bff-key-at-least-32-bytes",
         "OWNER_LOGIN_LINK_BASE": "https://admin.curricula.live/login/verify",
         "OWNER_LOGIN_SENDER": "no-reply@curricula.live",
+        "OWNER_RATE_LIMIT_KEY": "isolated-ci-only-owner-rate-key-more-than-32",
         "IS_PRODUCTION": False,
     }
     machine_header = {"HTTP_X_ADMIN_BFF_SECRET": opts["OWNER_BFF_SHARED_SECRET"]}

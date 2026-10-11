@@ -27,6 +27,7 @@ FLAGS = dict(
     OWNER_BFF_SHARED_SECRET=SECRET,
     OWNER_LOGIN_LINK_BASE="https://admin.curricula.live/login/verify",
     OWNER_LOGIN_SENDER="no-reply@curricula.live",
+    OWNER_RATE_LIMIT_KEY="isolated-ci-only-owner-rate-key-more-than-32",
     IS_PRODUCTION=False,
 )
 
@@ -185,3 +186,34 @@ def test_email_http_routes_cannot_be_enabled_in_production_before_security_gates
 @override_settings(**{**FLAGS, "OWNER_LOGIN_LINK_BASE": "http://localhost:badport/login/verify"})
 def test_invalid_link_port_fails_closed(client):
     assert post(client, "owner-auth-request", {"email": "owner@example.org"}, **HEADERS).status_code == 404
+
+
+@pytest.fixture(autouse=True)
+def isolate_rate_limiter_in_http_unit_tests():
+    # Real database quota behavior is exercised by the PostgreSQL integration job.
+    with patch("core.owner_auth_http.consume_owner_request_quota", return_value=True):
+        yield
+
+
+@override_settings(**FLAGS)
+def test_throttled_address_is_neutral_and_never_issues_or_sends(client):
+    with (
+        patch("core.owner_auth_http.consume_owner_request_quota", return_value=False) as quota,
+        patch("core.owner_auth_http.issue_challenge") as issued,
+        patch("core.owner_auth_http.send_mail") as mailed,
+    ):
+        denied = post(client, "owner-auth-request", {"email": "owner@example.org"}, **HEADERS)
+    assert denied.status_code == 202
+    assert denied.json() == {"message": "If an eligible account exists, a sign-in email will be sent."}
+    assert denied["Cache-Control"] == "private, no-store"
+    quota.assert_called_once_with("owner@example.org")
+    issued.assert_not_called()
+    mailed.assert_not_called()
+
+
+@override_settings(**{**FLAGS, "OWNER_RATE_LIMIT_KEY": "weak"})
+def test_weak_rate_limit_secret_fails_closed(client):
+    with patch("core.owner_auth_http.issue_challenge") as issued:
+        denied = post(client, "owner-auth-request", {"email": "owner@example.org"}, **HEADERS)
+    assert denied.status_code == 404
+    issued.assert_not_called()
