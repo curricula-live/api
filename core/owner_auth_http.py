@@ -47,17 +47,27 @@ def _link_destination() -> str | None:
             and url.netloc == "admin.curricula.live"
             and url.path == "/login/verify"
         )
-        local = (
+        local_http = (
             not settings.IS_PRODUCTION
             and url.scheme == "http"
             and url.hostname in ("localhost", "127.0.0.1")
             and url.port == 3000
             and url.path == "/login/verify"
         )
+        # Disposable TLS reverse-proxy fixture only. No preview hostname,
+        # arbitrary port, userinfo or redirect parameter is ever allowed.
+        local_https_staging = (
+            getattr(settings, "APP_ENV", "").lower() == "staging"
+            and not settings.IS_PRODUCTION
+            and url.scheme == "https"
+            and url.hostname == "localhost"
+            and url.port == 3443
+            and url.path == "/login/verify"
+        )
     except ValueError:
         # Invalid TCP port, malformed URL or URL-split credentials fail closed.
         return None
-    if not (production or local):
+    if not (production or local_http or local_https_staging):
         return None
     return configured
 
