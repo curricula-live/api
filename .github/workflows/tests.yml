@@ -62,6 +62,7 @@ jobs:
       DATABASE_URL: postgresql://atlas_ci:isolated-ci-only@localhost:5432/atlas_auth_ci
       ADMIN_DDL_PATH: ${{ github.workspace }}/shared-data/database/migrations/0002_admin_owner.sql
       ADMIN_OUTBOX_DDL_PATH: ${{ github.workspace }}/shared-data/database/migrations/0003_owner_mail_outbox.sql
+      KNOWLEDGE_DDL_PATH: ${{ github.workspace }}/shared-data/database/migrations/0001_knowledge_core.sql
     steps:
       - name: Check out API
         uses: actions/checkout@v4
@@ -83,6 +84,6 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --dev
       - name: Verify expected shared schema exists
-        run: test -s "$ADMIN_DDL_PATH" && test -s "$ADMIN_OUTBOX_DDL_PATH"
+        run: test -s "$ADMIN_DDL_PATH" && test -s "$ADMIN_OUTBOX_DDL_PATH" && test -s "$KNOWLEDGE_DDL_PATH"
       - name: Run real PostgreSQL owner authorization tests
-        run: uv run pytest --ds=config.settings -q tests/test_owner_auth_postgres.py tests/test_owner_passwordless_postgres.py tests/test_owner_rate_limit_postgres.py tests/test_owner_mail_postgres.py
+        run: uv run pytest --ds=config.settings -q tests/test_owner_auth_postgres.py tests/test_owner_passwordless_postgres.py tests/test_owner_rate_limit_postgres.py tests/test_owner_mail_postgres.py tests/test_atlas_postgres.py
