@@ -59,3 +59,29 @@ def concept_by_slug_preview(request, slug: str) -> JsonResponse:
 @require_GET
 def concept_by_id_preview(request, concept_id) -> JsonResponse:
     return _read(knowledge_v2_repository.get_concept_by_id, concept_id)
+
+
+@require_GET
+def concept_list_preview(request) -> JsonResponse:
+    """Public, bounded staging read; never requires owner authentication."""
+    if not _enabled():
+        raise Http404("Not available")
+    try:
+        limit = int(request.GET.get("limit", "100"))
+        offset = int(request.GET.get("offset", "0"))
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "limit and offset must be integers"}, status=400)
+    if not 1 <= limit <= 100 or not 0 <= offset <= 100000:
+        return JsonResponse({"error": "limit must be 1..100 and offset 0..100000"}, status=400)
+    try:
+        concepts = knowledge_v2_repository.list_concepts(limit=limit, offset=offset)
+    except (OperationalError, ProgrammingError):
+        return JsonResponse({"error": "v2 preview database unavailable"}, status=503, headers={"Cache-Control": "no-store"})
+    return JsonResponse({
+        "contract_version": "knowledge-v2-preview@1",
+        "release_verified": False,
+        "results": [{"id": str(c.id), "slug": c.slug, "label": c.label} for c in concepts],
+        "limit": limit,
+        "offset": offset,
+        "has_more": len(concepts) == limit,
+    }, headers={"Cache-Control": "no-store"})
