@@ -29,3 +29,11 @@ urlpatterns = [
     path("relations/<uuid:relation_id>/", relation_detail, name="relation-detail"),
     path("relation-types/", relation_type_list, name="relation-type-list"),
 ]
+
+from core import scholarly_views
+
+urlpatterns += [
+    path('scholarly/sources/', scholarly_views.sources, name='scholarly-sources'),
+    path('scholarly/sources/<slug:source_id>/<str:version>/nodes/', scholarly_views.nodes, name='scholarly-nodes'),
+    path('concepts/<str:slug>/evidence/', scholarly_views.concept_evidence, name='concept-evidence'),
+]
