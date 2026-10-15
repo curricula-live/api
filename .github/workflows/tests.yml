@@ -70,7 +70,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: curricula-live/data
-          ref: 1aa46b7602bedffd36cc27457d7fa91dd289b54d
+          ref: c83cf9229eeae4be2c67b95931020c8ca74b8d16
           path: shared-data
           persist-credentials: false
       - name: Set up Python
