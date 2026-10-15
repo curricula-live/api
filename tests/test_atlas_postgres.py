@@ -59,3 +59,13 @@ def test_anonymous_atlas_reads_real_canonical_schema(client):
     }]
     assert payload["definitions"] == []
     assert payload["references"] == []
+
+    # Same rows must be traversable anonymously by immutable concept UUID.
+    with override_settings(IS_PRODUCTION=False, V2_READ_PREVIEW_ENABLED=True):
+        neighborhood = client.get(reverse("v2-preview-concept-relationships", kwargs={"concept_id": OS}))
+    assert neighborhood.status_code == 200
+    statement = neighborhood.json()["relationships"][0]
+    assert statement["id"] == str(STATEMENT)
+    assert statement["source"]["id"] == str(FILES)
+    assert statement["target"]["id"] == str(OS)
+    assert statement["direction"] == "incoming"
