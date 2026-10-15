@@ -36,3 +36,14 @@ def get_concept_by_id(identifier: UUID, *, manager: Any = None) -> CanonicalConc
         raise ValueError("expected canonical UUID")
     query = V2Concept.objects if manager is None else manager
     return _to_concept(query.filter(id=identifier).values("id", "slug", "label").first())
+
+
+def list_concepts(*, limit: int = 100, offset: int = 0, manager: Any = None) -> list[CanonicalConcept]:
+    """Read a bounded page of canonical identities, ordered deterministically."""
+    if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 100:
+        raise ValueError("limit must be between 1 and 100")
+    if not isinstance(offset, int) or isinstance(offset, bool) or not 0 <= offset <= 100000:
+        raise ValueError("offset must be between 0 and 100000")
+    query = V2Concept.objects if manager is None else manager
+    rows = query.order_by("slug", "id").values("id", "slug", "label")[offset:offset + limit]
+    return [_to_concept(row) for row in rows]
