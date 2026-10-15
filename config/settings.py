@@ -26,6 +26,8 @@ IS_PRODUCTION = APP_ENV.lower() == "production"
 
 # Preview is development/staging-only. Never enable from production config.
 V2_READ_PREVIEW_ENABLED = env.bool("V2_READ_PREVIEW_ENABLED", default=False) and not IS_PRODUCTION
+PUBLIC_V2_ENABLED = env.bool("PUBLIC_V2_ENABLED", default=False)
+PUBLIC_V2_RELEASE_COMMIT = env("PUBLIC_V2_RELEASE_COMMIT", default="")
 
 # Owner verification must be explicitly enabled after the data-owned admin
 # schema and owner principal are provisioned. Defaults to fail-closed.
@@ -48,6 +50,10 @@ EMAIL_BACKEND = env("DJANGO_EMAIL_BACKEND", default="django.core.mail.backends.s
 EMAIL_FILE_PATH = env("DJANGO_EMAIL_FILE_PATH", default="")
 EMAIL_HOST = env("DJANGO_EMAIL_HOST", default="localhost")
 EMAIL_PORT = env.int("DJANGO_EMAIL_PORT", default=25)
+EMAIL_HOST_USER = env("DJANGO_EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("DJANGO_EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = env.bool("DJANGO_EMAIL_USE_TLS", default=False)
+EMAIL_USE_SSL = env.bool("DJANGO_EMAIL_USE_SSL", default=False)
 
 
 # Keep the secret explicit in every environment. The example .env documents a

@@ -22,6 +22,7 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 
 from core.owner_rate_limit import consume_owner_request_quota
+from core.owner_mail_worker import worker_enabled
 
 from core.owner_passwordless import (
     issue_challenge,
@@ -78,9 +79,9 @@ def _configured() -> bool:
     return (
         # Production requires a shared rate limiter and asynchronous email
         # delivery to avoid enumeration through SMTP response timing.
-        not settings.IS_PRODUCTION
-        and getattr(settings, "OWNER_AUTH_ENABLED", False)
+        getattr(settings, "OWNER_AUTH_ENABLED", False)
         and getattr(settings, "OWNER_AUTH_HTTP_ENABLED", False)
+        and (not settings.IS_PRODUCTION or worker_enabled())
         and isinstance(secret, str)
         and len(secret) >= 32
         and isinstance(sender, str)

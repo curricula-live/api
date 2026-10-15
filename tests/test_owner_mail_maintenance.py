@@ -15,7 +15,6 @@ STAGING = {
 
 
 @pytest.mark.parametrize("override", [
-    {"APP_ENV": "production", "IS_PRODUCTION": True},
     {"OWNER_ASYNC_MAIL_ENABLED": False},
     {"OWNER_EMAIL_WORKER_ENABLED": False},
 ])
@@ -41,6 +40,7 @@ def test_management_command_requires_confirmation():
 
 @override_settings(APP_ENV="production", IS_PRODUCTION=True,
                    OWNER_ASYNC_MAIL_ENABLED=True, OWNER_EMAIL_WORKER_ENABLED=True)
-def test_management_command_cannot_run_in_production():
-    with pytest.raises(CommandError, match="disabled"):
+def test_production_cleanup_uses_distinct_confirmation():
+    assert maintenance_enabled()
+    with pytest.raises(CommandError, match="confirmation"):
         call_command("maintain_owner_mail", "--confirm", "MAINTAIN-STAGING-OWNER-MAIL")

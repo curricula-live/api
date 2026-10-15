@@ -1,23 +1,25 @@
-"""Run a bounded staging-only batch of the owner passwordless mail outbox."""
+"""Run a bounded owner passwordless mail outbox batch."""
 from __future__ import annotations
 
 from django.core.management.base import BaseCommand, CommandError
+from django.conf import settings
 
 from core.owner_mail_worker import dispatch_one, worker_enabled
 
 
 class Command(BaseCommand):
-    help = "Dispatch at most N isolated staging owner email challenges"
+    help = "Dispatch at most N owner email challenges"
 
     def add_arguments(self, parser):
         parser.add_argument("--limit", type=int, default=5)
         parser.add_argument("--confirm", required=True)
 
     def handle(self, *args, **options):
-        if options["confirm"] != "SEND-STAGING-OWNER-MAIL":
-            raise CommandError("explicit staging mail confirmation required")
+        confirmation = "SEND-PRODUCTION-OWNER-MAIL" if settings.IS_PRODUCTION else "SEND-STAGING-OWNER-MAIL"
+        if options["confirm"] != confirmation:
+            raise CommandError("explicit owner mail confirmation required")
         if not worker_enabled():
-            raise CommandError("staging mail delivery settings are disabled or invalid")
+            raise CommandError("owner mail delivery settings are disabled or invalid")
         limit = options["limit"]
         if not 1 <= limit <= 20:
             raise CommandError("limit must be between 1 and 20")
@@ -29,6 +31,6 @@ class Command(BaseCommand):
                 break
         # Never output addresses, challenge IDs, generated links, or exceptions.
         self.stdout.write(
-            "owner staging mail: " +
+            "owner mail: " +
             ", ".join(f"{label}={count}" for label, count in sorted(results.items()))
         )

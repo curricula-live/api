@@ -340,10 +340,10 @@ def test_maintenance_discards_crashed_fifth_attempt_and_prunes_old_quotas():
 
 
 @override_settings(**CONFIG)
-def test_owner_mail_cleanup_refuses_production_even_with_feature_flag():
-    from core.owner_mail_maintenance import sweep_owner_mail
+def test_owner_mail_cleanup_runs_in_production_with_explicit_worker_gate():
+    from core.owner_mail_maintenance import sweep_owner_mail, maintenance_enabled
 
     setup_owner()
     with override_settings(APP_ENV="production", IS_PRODUCTION=True):
-        with pytest.raises(RuntimeError, match="disabled"):
-            sweep_owner_mail()
+        assert maintenance_enabled()
+        assert sweep_owner_mail() == (0, 0)

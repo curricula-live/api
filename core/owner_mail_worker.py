@@ -48,8 +48,15 @@ def utc_now(value: datetime | None = None) -> datetime:
 def worker_enabled() -> bool:
     from core.owner_auth_http import _link_destination
     return (
-        getattr(settings, "APP_ENV", "") == "staging"
-        and not getattr(settings, "IS_PRODUCTION", False)
+        ((getattr(settings, "APP_ENV", "") == "staging" and not settings.IS_PRODUCTION)
+         or (getattr(settings, "APP_ENV", "") == "production" and settings.IS_PRODUCTION))
+        and (not settings.IS_PRODUCTION or getattr(settings, "EMAIL_BACKEND", "") == "django.core.mail.backends.smtp.EmailBackend")
+        and (not settings.IS_PRODUCTION or (
+            bool(getattr(settings, "EMAIL_HOST_USER", ""))
+            and bool(getattr(settings, "EMAIL_HOST_PASSWORD", ""))
+            and getattr(settings, "EMAIL_HOST", "").lower() not in ("", "localhost", "127.0.0.1")
+            and (bool(getattr(settings, "EMAIL_USE_TLS", False)) != bool(getattr(settings, "EMAIL_USE_SSL", False)))
+        ))
         and getattr(settings, "OWNER_ASYNC_MAIL_ENABLED", False) is True
         and getattr(settings, "OWNER_EMAIL_WORKER_ENABLED", False) is True
         and isinstance(getattr(settings, "OWNER_LOGIN_SENDER", ""), str)

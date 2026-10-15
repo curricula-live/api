@@ -16,8 +16,8 @@ RETAIN_BUCKETS = timedelta(days=2)
 
 def maintenance_enabled() -> bool:
     return (
-        getattr(settings, "APP_ENV", "") == "staging"
-        and not getattr(settings, "IS_PRODUCTION", False)
+        ((getattr(settings, "APP_ENV", "") == "staging" and not settings.IS_PRODUCTION)
+         or (getattr(settings, "APP_ENV", "") == "production" and settings.IS_PRODUCTION))
         and getattr(settings, "OWNER_ASYNC_MAIL_ENABLED", False) is True
         and getattr(settings, "OWNER_EMAIL_WORKER_ENABLED", False) is True
     )
