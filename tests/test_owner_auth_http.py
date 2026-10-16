@@ -242,3 +242,23 @@ def test_async_delivery_key_must_be_configured_before_request(client):
                       {"email": "owner@example.org"}, **HEADERS)
     assert result.status_code == 404
     issue.assert_not_called()
+
+
+def test_pinned_vercel_preview_magic_link_destination_is_staging_only(monkeypatch):
+    from core.owner_auth_http import _link_destination
+
+    staging_url = "https://curricula-live-admin-git-dev-dbxdrgsls-projects.vercel.app/login/verify"
+    monkeypatch.setenv("VERCEL_ENV", "preview")
+    with override_settings(**{**FLAGS, "APP_ENV": "staging", "OWNER_LOGIN_LINK_BASE": staging_url}):
+        assert _link_destination() == staging_url
+    with override_settings(**{**FLAGS, "APP_ENV": "production", "OWNER_LOGIN_LINK_BASE": staging_url}):
+        assert _link_destination() is None
+    with override_settings(**{**FLAGS, "APP_ENV": "staging", "IS_PRODUCTION": True, "OWNER_LOGIN_LINK_BASE": staging_url}):
+        assert _link_destination() is None
+    with override_settings(**{**FLAGS, "APP_ENV": "staging", "OWNER_LOGIN_LINK_BASE": staging_url + "?next=evil"}):
+        assert _link_destination() is None
+    with override_settings(**{**FLAGS, "APP_ENV": "staging", "OWNER_LOGIN_LINK_BASE": staging_url.replace(".vercel.app/", ".vercel.app.evil/")}):
+        assert _link_destination() is None
+    monkeypatch.delenv("VERCEL_ENV")
+    with override_settings(**{**FLAGS, "APP_ENV": "staging", "OWNER_LOGIN_LINK_BASE": staging_url}):
+        assert _link_destination() is None
