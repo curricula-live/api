@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import os
 from urllib.parse import quote, urlsplit
 
 from django.conf import settings
@@ -65,10 +66,18 @@ def _link_destination() -> str | None:
             and url.port == 3443
             and url.path == "/login/verify"
         )
+        exact_vercel_staging = (
+            not settings.IS_PRODUCTION
+            and getattr(settings, "APP_ENV", "").lower() == "staging"
+            and os.environ.get("VERCEL_ENV") == "preview"
+            and url.scheme == "https"
+            and url.netloc == "curricula-live-admin-git-dev-dbxdrgsls-projects.vercel.app"
+            and url.path == "/login/verify"
+        )
     except ValueError:
         # Invalid TCP port, malformed URL or URL-split credentials fail closed.
         return None
-    if not (production or local_http or local_https_staging):
+    if not (production or local_http or local_https_staging or exact_vercel_staging):
         return None
     return configured
 
