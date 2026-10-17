@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import logging
 import os
 from urllib.parse import quote, urlsplit
 
@@ -31,6 +32,8 @@ from core.owner_passwordless import (
     redeem_challenge,
     revoke_session,
 )
+
+logger = logging.getLogger(__name__)
 
 MAX_JSON_BYTES = 2048
 NEUTRAL = {"message": "If an eligible account exists, a sign-in email will be sent."}
@@ -179,10 +182,13 @@ def request_owner_link(request) -> HttpResponse:
                     [normalized],
                     fail_silently=False,
                 )
-        except Exception:
+        except Exception as error:
+            # Browser responses remain uniform. Staging diagnostics contain
+            # only the exception class, never email, SQL, link or credentials.
+            if getattr(settings, "APP_ENV", "") == "staging" and not settings.IS_PRODUCTION:
+                logger.error("owner_link_request_failed category=%s", type(error).__name__)
             # A uniform response also avoids leaking owner membership and
-            # provider failures. Operational alerting is a separate requirement.
-            pass
+            # provider failures.
     return _json(NEUTRAL, status=202)
 
 
