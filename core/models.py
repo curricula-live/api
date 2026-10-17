@@ -59,3 +59,6 @@ class Relation(models.Model):
 
     def __str__(self) -> str:
         return f"{self.source_id} —{self.type_id}→ {self.target_id}"
+
+# Separate managed tables for reviewed public releases.
+from .scholarly_models import ScholarlyRelease  # noqa: E402,F401

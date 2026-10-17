@@ -459,3 +459,31 @@ The `curricula-live` organisation separates application concerns into focused re
 ## License
 
 No explicit licence is currently included. Unless a licence is added, the repository remains under the copyright holder’s default rights.
+
+## Scholarly public releases (development milestone)
+
+Additive routes: `/v1/scholarly/sources/`, `/v1/scholarly/sources/<source>/<version>/nodes/`
+(`parent` for explicit children, `node` for one identifier), and
+`/v1/concepts/<slug>/evidence/`. `limit` is 1–100 (default 50); `offset` is 0–100000.
+Legacy graph responses remain unchanged. Missing published mappings are labelled
+`no_published_mapping`, which makes no claim about private review queues.
+
+`ScholarlyRelease` is a new managed JSON release table. Canonical tables remain
+unmanaged and unchanged. Only approved, licensed deterministic public exports
+from the Data repository may be installed. The command reruns the vendored
+contract (`core/scholarly_contract.py`, identical to Data `scripts/scholarly.py`).
+
+```sh
+# Isolated development DB only; never use a production DATABASE_URL here.
+APP_ENV=development uv run python manage.py migrate
+APP_ENV=development uv run python manage.py install_scholarly_release /path/to/public.json
+APP_ENV=development uv run python manage.py install_scholarly_release /path/to/public.json --apply
+```
+
+Installation defaults to plan-only and prohibits production settings. Identical
+source/version/content is a no-op; conflicting content for the same version is
+rejected. Mapping and definition installation is blocked until a UUID resolver
+for the verified canonical snapshot is available: the current models expose
+slugs only. No actual scholarly release has been installed. SQLite tests exercise
+synthetic fixtures only. PostgreSQL migration verification remains outstanding.
+The public HTTP surface is read-only; the installer is a local management command.

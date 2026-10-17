@@ -3,8 +3,8 @@ name: Tests
 on:
   push:
     branches: [main, dev]
+  # Run CI for draft/stacked PRs whose base is another feature branch too.
   pull_request:
-    branches: [main, dev]
 
 permissions:
   contents: read
@@ -40,3 +40,50 @@ jobs:
           DJANGO_ALLOWED_HOSTS: api.curricula.live
           DATABASE_URL: "sqlite://:memory:"
         run: uv run python manage.py check --deploy
+
+  owner-postgres-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: atlas_ci
+          POSTGRES_PASSWORD: isolated-ci-only
+          POSTGRES_DB: atlas_auth_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U atlas_ci -d atlas_auth_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      APP_ENV: test
+      DJANGO_SECRET_KEY: isolated-test-only-not-production-credentials
+      DATABASE_URL: postgresql://atlas_ci:isolated-ci-only@localhost:5432/atlas_auth_ci
+      ADMIN_DDL_PATH: ${{ github.workspace }}/shared-data/database/migrations/0002_admin_owner.sql
+      ADMIN_OUTBOX_DDL_PATH: ${{ github.workspace }}/shared-data/database/migrations/0003_owner_mail_outbox.sql
+      KNOWLEDGE_DDL_PATH: ${{ github.workspace }}/shared-data/database/migrations/0001_knowledge_core.sql
+    steps:
+      - name: Check out API
+        uses: actions/checkout@v4
+      - name: Check out pinned data-owned schema
+        uses: actions/checkout@v4
+        with:
+          repository: curricula-live/data
+          ref: c83cf9229eeae4be2c67b95931020c8ca74b8d16
+          path: shared-data
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --frozen --dev
+      - name: Verify expected shared schema exists
+        run: test -s "$ADMIN_DDL_PATH" && test -s "$ADMIN_OUTBOX_DDL_PATH" && test -s "$KNOWLEDGE_DDL_PATH"
+      - name: Run real PostgreSQL owner authorization tests
+        run: uv run pytest --ds=config.settings -q tests/test_owner_auth_postgres.py tests/test_owner_passwordless_postgres.py tests/test_owner_rate_limit_postgres.py tests/test_owner_mail_postgres.py tests/test_atlas_postgres.py

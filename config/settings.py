@@ -24,6 +24,38 @@ environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 APP_ENV = env("APP_ENV", default="development")
 IS_PRODUCTION = APP_ENV.lower() == "production"
 
+# Preview is development/staging-only. Never enable from production config.
+V2_READ_PREVIEW_ENABLED = env.bool("V2_READ_PREVIEW_ENABLED", default=False) and not IS_PRODUCTION
+PUBLIC_V2_ENABLED = env.bool("PUBLIC_V2_ENABLED", default=False)
+PUBLIC_V2_RELEASE_COMMIT = env("PUBLIC_V2_RELEASE_COMMIT", default="")
+
+# Owner verification must be explicitly enabled after the data-owned admin
+# schema and owner principal are provisioned. Defaults to fail-closed.
+OWNER_AUTH_ENABLED = env.bool("OWNER_AUTH_ENABLED", default=False)
+# Privileged BFF-only POST endpoints are a separate rollout gate.
+OWNER_AUTH_HTTP_ENABLED = env.bool("OWNER_AUTH_HTTP_ENABLED", default=False)
+OWNER_BFF_SHARED_SECRET = env("OWNER_BFF_SHARED_SECRET", default="")
+OWNER_LOGIN_LINK_BASE = env("OWNER_LOGIN_LINK_BASE", default="")
+OWNER_LOGIN_SENDER = env("OWNER_LOGIN_SENDER", default="")
+OWNER_RATE_LIMIT_KEY = env("OWNER_RATE_LIMIT_KEY", default="")
+# Staging-only asynchronous mail worker, configured with a dedicated private key.
+OWNER_ASYNC_MAIL_ENABLED = env.bool("OWNER_ASYNC_MAIL_ENABLED", default=False)
+OWNER_EMAIL_WORKER_ENABLED = env.bool("OWNER_EMAIL_WORKER_ENABLED", default=False)
+OWNER_EMAIL_TOKEN_KEY = env("OWNER_EMAIL_TOKEN_KEY", default="")
+EMAIL_TIMEOUT = env.int("OWNER_EMAIL_SMTP_TIMEOUT_SECONDS", default=10)
+# Explicit email backend configuration for isolated staging-provider tests.
+# File-based delivery is only used when specifically selected for disposable CI;
+# the default remains Django SMTP. Do not point this at a production mail store.
+EMAIL_BACKEND = env("DJANGO_EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")
+EMAIL_FILE_PATH = env("DJANGO_EMAIL_FILE_PATH", default="")
+EMAIL_HOST = env("DJANGO_EMAIL_HOST", default="localhost")
+EMAIL_PORT = env.int("DJANGO_EMAIL_PORT", default=25)
+EMAIL_HOST_USER = env("DJANGO_EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("DJANGO_EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = env.bool("DJANGO_EMAIL_USE_TLS", default=False)
+EMAIL_USE_SSL = env.bool("DJANGO_EMAIL_USE_SSL", default=False)
+
+
 # Keep the secret explicit in every environment. The example .env documents a
 # local-only value; deployed secrets belong in the hosting provider.
 SECRET_KEY = env("DJANGO_SECRET_KEY")

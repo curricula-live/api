@@ -1,5 +1,8 @@
 from django.urls import path
 
+from core.owner_auth_views import verify_owner_session
+from core.owner_auth_http import request_owner_link, redeem_owner_link, logout_owner_session
+
 from core.views import (
     concept_detail,
     concept_list,
@@ -12,6 +15,10 @@ from core.views import (
 )
 
 urlpatterns = [
+    path("admin/auth/session/", verify_owner_session, name="owner-auth-session"),
+    path("admin/auth/request/", request_owner_link, name="owner-auth-request"),
+    path("admin/auth/redeem/", redeem_owner_link, name="owner-auth-redeem"),
+    path("admin/auth/logout/", logout_owner_session, name="owner-auth-logout"),
     path("search/", search, name="search"),
     path("concepts/", concept_list, name="concept-list"),
     path("concepts/<str:slug>/", concept_detail, name="concept-detail"),
@@ -28,4 +35,12 @@ urlpatterns = [
     path("relations/", relation_list, name="relation-list"),
     path("relations/<uuid:relation_id>/", relation_detail, name="relation-detail"),
     path("relation-types/", relation_type_list, name="relation-type-list"),
+]
+
+from core import scholarly_views
+
+urlpatterns += [
+    path('scholarly/sources/', scholarly_views.sources, name='scholarly-sources'),
+    path('scholarly/sources/<slug:source_id>/<str:version>/nodes/', scholarly_views.nodes, name='scholarly-nodes'),
+    path('concepts/<str:slug>/evidence/', scholarly_views.concept_evidence, name='concept-evidence'),
 ]
