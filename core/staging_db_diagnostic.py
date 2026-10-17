@@ -24,6 +24,24 @@ def staging_database_health(request):
             report["rate_bucket_write"] = cursor.fetchone()[0] is True
     except Exception as exc:
         report["failure_category"] = type(exc).__name__
+        # Classify without returning exception messages, hosts or credentials.
+        message = str(exc).lower()
+        if "password authentication failed" in message or "invalid password" in message:
+            report["failure_kind"] = "invalid_password"
+        elif "tenant or user not found" in message or "user not found" in message:
+            report["failure_kind"] = "pooler_username"
+        elif "could not translate host name" in message or "name or service not known" in message:
+            report["failure_kind"] = "dns"
+        elif "connection refused" in message:
+            report["failure_kind"] = "refused"
+        elif "timed out" in message or "timeout expired" in message:
+            report["failure_kind"] = "timeout"
+        elif "ssl" in message or "certificate" in message:
+            report["failure_kind"] = "tls"
+        elif "too many connections" in message:
+            report["failure_kind"] = "connection_limit"
+        else:
+            report["failure_kind"] = "other"
     response = JsonResponse(report, status=200 if all(report.values()) else 503)
     response["Cache-Control"] = "private, no-store"
     return response
