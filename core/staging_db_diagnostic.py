@@ -12,6 +12,13 @@ def staging_database_health(request):
     if not expected or len(expected) < 32 or not hmac.compare_digest(provided, expected):
         raise Http404()
     report = {"connectivity": False, "knowledge_read": False, "owner_read": False, "rate_bucket_write": False}
+    cfg = connection.settings_dict
+    report["config"] = {
+        "role_matches": str(cfg.get("USER", "")).split(".")[0] == "curricula_staging_owner_api",
+        "pooler_host": str(cfg.get("HOST", "")).endswith(".pooler.supabase.com"),
+        "port_5432": str(cfg.get("PORT", "")) == "5432",
+        "password_present": bool(cfg.get("PASSWORD")),
+    }
     try:
         with connection.cursor() as cursor:
             cursor.execute("select 1")
@@ -24,6 +31,10 @@ def staging_database_health(request):
             report["rate_bucket_write"] = cursor.fetchone()[0] is True
     except Exception as exc:
         report["failure_category"] = type(exc).__name__
+        inner = getattr(exc, "__cause__", None)
+        report["driver_category"] = type(inner).__name__ if inner else None
+        state = getattr(inner, "sqlstate", None)
+        report["sqlstate"] = state if isinstance(state, str) and len(state) == 5 and state.isalnum() else None
         # Classify without returning exception messages, hosts or credentials.
         message = str(exc).lower()
         if "password authentication failed" in message or "invalid password" in message:
@@ -42,6 +53,6 @@ def staging_database_health(request):
             report["failure_kind"] = "connection_limit"
         else:
             report["failure_kind"] = "other"
-    response = JsonResponse(report, status=200 if all(report.values()) else 503)
+    response = JsonResponse(report, status=200 if all(report[k] for k in ("connectivity","knowledge_read","owner_read","rate_bucket_write")) else 503)
     response["Cache-Control"] = "private, no-store"
     return response
