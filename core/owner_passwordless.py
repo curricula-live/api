@@ -62,9 +62,16 @@ def issue_challenge(email: str, *, now: datetime | None = None, queue_delivery: 
     instant = utc_now(now)
     with transaction.atomic():
         with connection.cursor() as cursor:
+            # Serialize challenge issuance per email without UPDATE privileges
+            # on owner_principal. The dedicated login role must stay read-only
+            # against the canonical owner identity.
+            cursor.execute(
+                "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                ("owner-login-challenge:" + identity,),
+            )
             cursor.execute(
                 "select id from admin.owner_principal "
-                "where email=%s and role='owner' and active for update",
+                "where email=%s and role='owner' and active",
                 (identity,),
             )
             owner = cursor.fetchone()
