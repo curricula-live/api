@@ -18,6 +18,7 @@ from urllib.parse import quote, urlsplit
 
 from django.conf import settings
 from django.core.mail import send_mail
+from smtplib import SMTPDataError
 from django.db import DatabaseError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
@@ -186,7 +187,15 @@ def request_owner_link(request) -> HttpResponse:
             # Browser responses remain uniform. Staging diagnostics contain
             # only the exception class, never email, SQL, link or credentials.
             if getattr(settings, "APP_ENV", "") == "staging" and not settings.IS_PRODUCTION:
-                logger.error("owner_link_request_failed category=%s", type(error).__name__)
+                if isinstance(error, SMTPDataError):
+                    status = getattr(error, "smtp_code", None)
+                    # Never log provider text: it may contain private addresses.
+                    logger.error(
+                        "owner_link_request_failed category=SMTPDataError smtp_code=%s",
+                        status if isinstance(status, int) and 400 <= status <= 599 else "unknown",
+                    )
+                else:
+                    logger.error("owner_link_request_failed category=%s", type(error).__name__)
             # A uniform response also avoids leaking owner membership and
             # provider failures.
     return _json(NEUTRAL, status=202)
