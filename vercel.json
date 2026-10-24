@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/internal/cron/owner-mail/dispatch/",
+      "schedule": "*/1 * * * *"
+    },
+    {
+      "path": "/internal/cron/owner-mail/maintain/",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}
