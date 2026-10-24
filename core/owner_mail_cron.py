@@ -6,6 +6,7 @@ challenge identifiers or provider exceptions.
 from __future__ import annotations
 
 import hmac
+import os
 from django.conf import settings
 from django.http import HttpResponseNotAllowed, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -13,7 +14,7 @@ from django.views.decorators.cache import never_cache
 
 
 def _authorized(request):
-    secret = getattr(settings, "VERCEL_OWNER_MAIL_CRON_SECRET", "")
+    secret = os.environ.get("CRON_SECRET", "")
     if not isinstance(secret, str) or len(secret.encode("utf-8")) < 32:
         return False
     header = request.headers.get("Authorization", "")
