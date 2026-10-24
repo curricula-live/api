@@ -1,6 +1,5 @@
 """URL configuration for the curricula.live API."""
 
-from core.owner_mail_cron import dispatch_owner_mail_cron, maintain_owner_mail_cron
 from django.contrib import admin
 from django.urls import include, path
 
@@ -12,8 +11,6 @@ from core.public_v2 import concepts as public_concepts, concept_detail as public
 from core.v2_preview import concept_by_id_preview, concept_by_slug_preview, concept_list_preview
 
 urlpatterns = [
-    path("internal/cron/owner-mail/dispatch/", dispatch_owner_mail_cron),
-    path("internal/cron/owner-mail/maintain/", maintain_owner_mail_cron),
     path("", api_root, name="api-root"),
     path("admin/", admin.site.urls),
     path("health/", health, name="health"),

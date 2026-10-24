@@ -262,3 +262,28 @@ def test_pinned_vercel_preview_magic_link_destination_is_staging_only(monkeypatc
     monkeypatch.delenv("VERCEL_ENV")
     with override_settings(**{**FLAGS, "APP_ENV": "staging", "OWNER_LOGIN_LINK_BASE": staging_url}):
         assert _link_destination() is None
+
+@override_settings(**{**FLAGS, "OWNER_ASYNC_MAIL_ENABLED": True})
+def test_request_triggered_outbox_dispatch_is_uniform(client):
+    with (
+        patch("core.owner_auth_http.issue_challenge", return_value=None) as issue,
+        patch("core.owner_auth_http.consume_owner_request_quota", return_value=True),
+        patch("core.owner_auth_http.dispatch_one", return_value="idle") as dispatch,
+    ):
+        unknown = post(client, "owner-auth-request", {"email": "unknown@example.org"}, **HEADERS)
+        issue.assert_called_once_with("unknown@example.org", queue_delivery=True)
+        invalid = post(client, "owner-auth-request", {"email": "invalid address"}, **HEADERS)
+    assert unknown.status_code == invalid.status_code == 202
+    assert unknown.content == invalid.content
+    assert dispatch.call_count == 2
+
+@override_settings(**{**FLAGS, "OWNER_ASYNC_MAIL_ENABLED": True})
+def test_request_triggered_dispatch_failure_is_neutral(client):
+    with (
+        patch("core.owner_auth_http.issue_challenge", return_value=None),
+        patch("core.owner_auth_http.consume_owner_request_quota", return_value=True),
+        patch("core.owner_auth_http.dispatch_one", side_effect=RuntimeError("private SMTP details")),
+    ):
+        response = post(client, "owner-auth-request", {"email": "owner@example.org"}, **HEADERS)
+    assert response.status_code == 202
+    assert b"SMTP" not in response.content

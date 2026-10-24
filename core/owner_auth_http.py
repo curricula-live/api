@@ -25,7 +25,7 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 
 from core.owner_rate_limit import consume_owner_request_quota
-from core.owner_mail_worker import worker_enabled
+from core.owner_mail_worker import worker_enabled, dispatch_one
 
 from core.owner_passwordless import (
     issue_challenge,
@@ -167,7 +167,7 @@ def request_owner_link(request) -> HttpResponse:
             queued = getattr(settings, "OWNER_ASYNC_MAIL_ENABLED", False) is True
             if queued:
                 # Persist the challenge and outbox ticket in one transaction.
-                # No network/email operation runs on this HTTP request.
+                # A bounded delivery attempt runs in this request on Vercel Hobby.
                 issued = issue_challenge(normalized, queue_delivery=True) if quota_ok else None
             else:
                 issued = issue_challenge(normalized) if quota_ok else None
@@ -198,6 +198,13 @@ def request_owner_link(request) -> HttpResponse:
                     logger.error("owner_link_request_failed category=%s", type(error).__name__)
             # A uniform response also avoids leaking owner membership and
             # provider failures.
+    if getattr(settings, "OWNER_ASYNC_MAIL_ENABLED", False):
+        # Attempt a bounded outbox delivery for every request, including unknown
+        # identities, so owner existence does not control the dispatch branch.
+        try:
+            dispatch_one()
+        except Exception:
+            pass  # Preserve neutral response; do not log SMTP secrets or links.
     return _json(NEUTRAL, status=202)
 
 
