@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Vercel local configuration and pulled credentials
+.vercel/
+.env.local
+.env.*.local
