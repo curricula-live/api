@@ -150,18 +150,53 @@ def _derive_subtypes(slug: str, edges: list[dict], depth: int) -> list[dict]:
 
 def build_documentation(slug: str, depth: int) -> dict:
     distances, edges, truncated = _read_neighborhood(slug, depth)
-    # Classification is not claimed to be a complete, reviewed definition.
+    # Only conjoin independently recorded direct facts. No implicit or/not/iff.
     direct_types = sorted(
         (edge for edge in edges if edge["source"] == slug and
          edge["predicate"] == "subtype_of"),
         key=lambda edge: (edge["target"], edge["id"]),
     )
-    characterization = {
-        "text": " ".join(edge["text"] for edge in direct_types),
-        "assertion_ids": [edge["id"] for edge in direct_types],
-        "status": STATUS,
-        "method": "direct_subtype_statements_only",
-    } if direct_types else None
+    characterization = None
+    if direct_types:
+        names = [_article(_name(edge["target"])) + " " + _name(edge["target"]).lower()
+                 for edge in direct_types[:4]]
+        if len(names) == 1:
+            text = f"{_name(slug)} is {names[0]}."
+        else:
+            text = f"{_name(slug)} is " + ", ".join(names[:-1]) + " and " + names[-1] + "."
+        supporting = [edge["id"] for edge in direct_types[:4]]
+
+        # Uses/operations are mentioned as additional statements, not new
+        # necessary-and-sufficient conditions for membership of the class.
+        for predicate, verb in (("uses", "uses"), ("processes", "processes"),
+                                ("produces", "produces"), ("represents", "represents")):
+            group = sorted(
+                (edge for edge in edges if edge["source"] == slug and
+                 edge["predicate"] == predicate),
+                key=lambda edge: (edge["target"], edge["id"]),
+            )[:2]
+            if group:
+                targets = [_name(edge["target"]).lower() for edge in group]
+                text += " It " + verb + " " + " and ".join(targets) + "."
+                supporting.extend(edge["id"] for edge in group)
+
+        # This is explicitly a separate inverse fact, not a logical
+        # consequence of uses or subtype_of.
+        parts = sorted(
+            (edge for edge in edges if edge["target"] == slug and
+             edge["predicate"] == "part_of"),
+            key=lambda edge: (edge["source"], edge["id"]),
+        )[:2]
+        for edge in parts:
+            text += " " + edge["text"]
+            supporting.append(edge["id"])
+
+        characterization = {
+            "text": text,
+            "assertion_ids": supporting,
+            "status": STATUS,
+            "method": "direct_conjunctive_assertions",
+        }
 
     return {
         "contract_version": "legacy-concept-documentation@1",
