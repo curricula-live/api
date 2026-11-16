@@ -14,9 +14,9 @@ from django.views.decorators.http import require_GET
 from core.models import Concept, Relation
 
 DEFAULT_DEPTH = 2
-MAX_DEPTH = 3
-MAX_NODES = 26
-MAX_EDGES = 48
+MAX_DEPTH = 5
+MAX_NODES = 120
+MAX_EDGES = 240
 STATUS = "provisional_legacy_graph"
 RULE = "subtype_of_transitivity"
 
@@ -208,9 +208,9 @@ def concept_documentation(request, slug):
     try:
         depth = int(raw_depth)
     except (TypeError, ValueError):
-        return JsonResponse({"error": "depth must be an integer from 1 to 3"}, status=400)
+        return JsonResponse({"error": "depth must be an integer from 1 to 5"}, status=400)
     if depth < 1 or depth > MAX_DEPTH:
-        return JsonResponse({"error": "depth must be between 1 and 3"}, status=400)
+        return JsonResponse({"error": "depth must be between 1 and 5"}, status=400)
 
     response = JsonResponse(build_documentation(concept.slug, depth))
     response["Cache-Control"] = "no-store"
