@@ -142,6 +142,18 @@ def test_query_count_scales_with_depth_not_total_neighbors(client, curriculum_gr
     assert page["source"]["is_published_v2"] is False
 
 
+def test_proof_relevant_subtype_kept_when_graph_budget_is_exhausted(client, curriculum_graph):
+    # Without predicate-aware ordering, many 'part_of' links can fill the
+    # node budget before one important subtype classification is examined.
+    for index in range(160):
+        _add(curriculum_graph, "array", "part_of", f"filler-{index:03}")
+    classification = _add(curriculum_graph, "array", "subtype_of", "important-category")
+    page = client.get(_url() + "?depth=1").json()
+    assert page["traversal"]["truncated"] is True
+    assert "important-category" in {node["slug"] for node in page["graph"]["nodes"]}
+    assert str(classification.id) in {row["id"] for row in page["asserted_statements"]}
+
+
 def test_bounded_graph_reports_truncation(client, curriculum_graph):
     for index in range(255):
         _add(curriculum_graph, "array", "uses", f"neighbor-{index:02}")
