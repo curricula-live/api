@@ -24,6 +24,10 @@ environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 APP_ENV = env("APP_ENV", default="development")
 IS_PRODUCTION = APP_ENV.lower() == "production"
 
+# Built-in Django admin is a local-only diagnostic tool, never a public API route.
+# Opt-in explicitly for development; APP_ENV=production always disables it.
+DJANGO_ADMIN_ENABLED = env.bool("DJANGO_ADMIN_ENABLED", default=False) and not IS_PRODUCTION
+
 # Preview is development/staging-only. Never enable from production config.
 V2_READ_PREVIEW_ENABLED = env.bool("V2_READ_PREVIEW_ENABLED", default=False) and not IS_PRODUCTION
 PUBLIC_V2_ENABLED = env.bool("PUBLIC_V2_ENABLED", default=False)
