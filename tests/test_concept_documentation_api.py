@@ -126,6 +126,22 @@ def test_cycle_cannot_prove_a_concept_is_its_own_subtype(client, curriculum_grap
     assert all(d["target"] != "array" for d in page["derived_statements"])
 
 
+def test_query_count_scales_with_depth_not_total_neighbors(client, curriculum_graph, django_assert_max_num_queries):
+    # A multi-branch graph still requires one concept-existence read and one
+    # batched relation lookup per hop, instead of one query per discovered node.
+    for index in range(35):
+        middle = f"neighbor-{index:02}"
+        _add(curriculum_graph, "array", "uses", middle)
+        _add(curriculum_graph, middle, "subtype_of", f"category-{index:02}")
+    with django_assert_max_num_queries(4):
+        response = client.get(_url() + "?depth=3")
+    assert response.status_code == 200
+    page = response.json()
+    assert len(page["graph"]["edges"]) >= 70
+    assert len(page["graph"]["nodes"]) > 35
+    assert page["source"]["is_published_v2"] is False
+
+
 def test_bounded_graph_reports_truncation(client, curriculum_graph):
     for index in range(255):
         _add(curriculum_graph, "array", "uses", f"neighbor-{index:02}")
