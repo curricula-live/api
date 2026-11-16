@@ -75,6 +75,22 @@ def test_three_hop_path_witness_is_ordered_and_no_phantom_direct_edges(client, c
                    for edge in page["asserted_statements"])
 
 
+def test_five_hops_reach_longer_subtype_chains(client, curriculum_graph):
+    first = "array"
+    edge_ids = []
+    for level in range(1, 6):
+        next_slug = f"level-{level}"
+        edge_ids.append(str(_add(curriculum_graph, first, "subtype_of", next_slug).id))
+        first = next_slug
+    short = client.get(_url() + "?depth=2").json()
+    deep = client.get(_url() + "?depth=5").json()
+    assert "level-5" not in {node["slug"] for node in short["graph"]["nodes"]}
+    assert "level-5" in {node["slug"] for node in deep["graph"]["nodes"]}
+    witness = next(row for row in deep["derived_statements"] if row["target"] == "level-5")
+    assert witness["premise_ids"] == edge_ids
+    assert deep["traversal"]["depth"] == 5
+
+
 def test_uses_and_part_of_never_promoted_to_subtype_or_indexed_access(client, curriculum_graph):
     _add(curriculum_graph, "array", "uses", "matrix")
     # The shared curriculum_graph fixture already records matrix subtype_of data-structure.
@@ -94,7 +110,7 @@ def test_no_invented_definition_when_no_subtype(client, curriculum_graph):
                              "edges": []}
 
 
-@pytest.mark.parametrize("query", ["?depth=0", "?depth=4", "?depth=x", "?depth=1.4"])
+@pytest.mark.parametrize("query", ["?depth=0", "?depth=6", "?depth=x", "?depth=1.4"])
 def test_rejects_invalid_depth(client, curriculum_graph, query):
     assert client.get(_url() + query).status_code == 400
 
@@ -111,7 +127,7 @@ def test_cycle_cannot_prove_a_concept_is_its_own_subtype(client, curriculum_grap
 
 
 def test_bounded_graph_reports_truncation(client, curriculum_graph):
-    for index in range(54):
+    for index in range(255):
         _add(curriculum_graph, "array", "uses", f"neighbor-{index:02}")
     page = client.get(_url() + "?depth=3").json()
     assert page["traversal"]["truncated"] is True
