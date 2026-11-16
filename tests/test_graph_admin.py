@@ -2,7 +2,7 @@ import uuid
 
 import pytest
 from django.contrib import admin
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 
 from core.admin import ConceptAdmin, RelationAdmin, RelationTypeAdmin
 from core.models import Concept, Relation, RelationType
@@ -46,9 +46,13 @@ def test_graph_admin_primary_keys_are_editable_only_when_creating(
     assert model_admin.get_readonly_fields(request, obj=new_object) == (primary_key,)
 
 
-@pytest.mark.django_db
-def test_admin_index_requires_authentication(client):
-    response = client.get(reverse("admin:index"))
+def test_django_admin_is_not_publicly_routed_by_default(client):
+    with pytest.raises(NoReverseMatch):
+        reverse("admin:index")
 
-    assert response.status_code == 302
-    assert response.url.startswith(reverse("admin:login"))
+    assert client.get("/admin/").status_code == 404
+    assert client.get("/admin/login/").status_code == 404
+
+
+def test_owner_auth_route_is_independent_of_django_admin():
+    assert reverse("owner-auth-session") == "/v1/admin/auth/session/"
