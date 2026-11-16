@@ -6,7 +6,7 @@ inference rule is directional, exact-predicate subtype_of transitivity.
 from __future__ import annotations
 
 from collections import deque
-from django.db.models import Q
+from django.db.models import Case, IntegerField, Q, Value, When
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_GET
@@ -62,11 +62,23 @@ def _read_neighborhood(slug: str, depth: int) -> tuple[dict[str, int], list[dict
             truncated = True
             break
 
+        # Under a bounded response, keep probable classification proof paths
+        # ahead of broad associations. This is a display/traversal priority,
+        # NOT an epistemic claim that one predicate is universally more true.
         rows = list(
             Relation.objects.filter(
                 Q(source_id__in=frontier) | Q(target_id__in=frontier)
             )
-            .order_by("source_id", "type_id", "target_id", "id")
+            .annotate(
+                _navigation_priority=Case(
+                    When(source_id__in=frontier, type_id="subtype_of", then=Value(0)),
+                    When(target_id__in=frontier, type_id="subtype_of", then=Value(1)),
+                    When(source_id__in=frontier, then=Value(2)),
+                    default=Value(3),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("_navigation_priority", "source_id", "type_id", "target_id", "id")
             .values("id", "source_id", "type_id", "target_id")[: MAX_EDGES * 2 + 1]
         )
         if len(rows) > MAX_EDGES * 2:
