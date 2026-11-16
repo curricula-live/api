@@ -4,5 +4,6 @@ import os
 os.environ["DATABASE_URL"] = "sqlite://:memory:"
 os.environ["DJANGO_SECRET_KEY"] = "django-insecure-test-suite-only"
 os.environ["DJANGO_DEBUG"] = "false"
+os.environ["DJANGO_ADMIN_ENABLED"] = "false"
 
 from .settings import *  # noqa: E402,F401,F403
