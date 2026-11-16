@@ -43,55 +43,58 @@ def _sentence(subject: str, predicate: str, target: str) -> str:
     return f"{left} —{predicate}→ {_name(target)}."
 
 
-def _relation_values(slug: str) -> list[dict]:
-    return list(
-        Relation.objects.filter(Q(source_id=slug) | Q(target_id=slug))
-        .order_by("source_id", "type_id", "target_id", "id")
-        .values("id", "source_id", "type_id", "target_id")[:MAX_EDGES + 1]
-    )
-
-
 def _read_neighborhood(slug: str, depth: int) -> tuple[dict[str, int], list[dict], bool]:
-    """Bounded BFS in both directions; every statement retains the original UUID."""
+    """Depth-batched, bounded BFS over actual DB relation IDs and directions.
+
+    Read one bounded relation set per hop rather than one DB round-trip per
+    visited node. A high-degree graph may truncate, never fabricate edges.
+    """
     distances = {slug: 0}
-    queue = deque([slug])
+    frontier = [slug]
     seen_relations = set()
     edges = []
     truncated = False
 
-    while queue:
-        current = queue.popleft()
-        current_depth = distances[current]
-        if current_depth >= depth:
-            continue
+    for hop in range(depth):
+        if not frontier:
+            break
+        if len(edges) >= MAX_EDGES:
+            truncated = True
+            break
 
-        rows = _relation_values(current)
-        if len(rows) > MAX_EDGES:
+        rows = list(
+            Relation.objects.filter(
+                Q(source_id__in=frontier) | Q(target_id__in=frontier)
+            )
+            .order_by("source_id", "type_id", "target_id", "id")
+            .values("id", "source_id", "type_id", "target_id")[: MAX_EDGES * 2 + 1]
+        )
+        if len(rows) > MAX_EDGES * 2:
             truncated = True
 
+        next_frontier = []
         for row in rows:
             relation_id = str(row["id"])
             if relation_id in seen_relations:
                 continue
             seen_relations.add(relation_id)
-
             if len(edges) >= MAX_EDGES:
                 truncated = True
                 break
 
             source, target = row["source_id"], row["target_id"]
-            neighbor = target if source == current else source
-            if neighbor not in distances:
+            for neighbor in (source, target):
+                if neighbor in distances:
+                    continue
                 if len(distances) >= MAX_NODES:
                     truncated = True
                     continue
-                distances[neighbor] = current_depth + 1
-                queue.append(neighbor)
+                distances[neighbor] = hop + 1
+                next_frontier.append(neighbor)
 
             if source not in distances or target not in distances:
                 truncated = True
                 continue
-
             edges.append({
                 "id": relation_id,
                 "source": source,
@@ -101,6 +104,7 @@ def _read_neighborhood(slug: str, depth: int) -> tuple[dict[str, int], list[dict
                 "status": STATUS,
                 "hop": max(distances[source], distances[target]),
             })
+        frontier = next_frontier
 
     edges.sort(key=lambda edge: (
         edge["hop"], edge["source"], edge["predicate"], edge["target"], edge["id"]
