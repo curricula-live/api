@@ -33,13 +33,13 @@ def main() -> None:
     args = parser.parse_args()
 
     temp_root = Path(tempfile.gettempdir()).resolve()
+    if args.output.is_symlink():
+        parser.error("Refusing to follow an existing SQLite symlink")
     output = args.output.resolve()
     if output.suffix != ".sqlite3" or not output.is_relative_to(temp_root) or output == temp_root:
         parser.error("SQLite output must end in .sqlite3 and be inside the OS temp directory")
     if output.exists() and not args.replace:
         parser.error(f"Refusing to overwrite {output} without --replace")
-    if output.is_symlink():
-        parser.error("Refusing to follow an existing SQLite symlink")
     data_root = args.data_root.expanduser().resolve()
     if not (data_root / "knowledge" / "concepts.jsonl").is_file():
         parser.error("Provide an existing canonical data repo containing knowledge/concepts.jsonl")
