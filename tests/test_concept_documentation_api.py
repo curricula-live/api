@@ -77,7 +77,7 @@ def test_three_hop_path_witness_is_ordered_and_no_phantom_direct_edges(client, c
 
 def test_uses_and_part_of_never_promoted_to_subtype_or_indexed_access(client, curriculum_graph):
     _add(curriculum_graph, "array", "uses", "matrix")
-    _add(curriculum_graph, "matrix", "subtype_of", "data-structure")
+    # The shared curriculum_graph fixture already records matrix subtype_of data-structure.
     page = client.get(_url() + "?depth=3").json()
     assert "Array uses matrix." in [e["text"] for e in page["asserted_statements"]]
     assert page["derivation_policy"]["uses_implies_indexed_access"] is False
