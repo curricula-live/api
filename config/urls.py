@@ -1,5 +1,6 @@
 """URL configuration for the curricula.live API."""
 
+from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path
 
@@ -12,7 +13,6 @@ from core.v2_preview import concept_by_id_preview, concept_by_slug_preview, conc
 
 urlpatterns = [
     path("", api_root, name="api-root"),
-    path("admin/", admin.site.urls),
     path("health/", health, name="health"),
     path("internal/staging-db-health/", staging_database_health, name="staging-db-health"),
     path("v1/", include("core.urls")),
@@ -25,3 +25,8 @@ urlpatterns = [
     path("v2-preview/concepts/by-slug/<slug:slug>/", concept_by_slug_preview, name="v2-preview-concept-slug"),
     path("v2-preview/concepts/<uuid:concept_id>/", concept_by_id_preview, name="v2-preview-concept-uuid"),
 ]
+
+# Keep the Django admin unavailable on public deployments. The separate
+# /v1/admin/auth/ owner BFF contract remains mounted independently.
+if settings.DJANGO_ADMIN_ENABLED:
+    urlpatterns.append(path("admin/", admin.site.urls))

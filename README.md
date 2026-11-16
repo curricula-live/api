@@ -27,7 +27,7 @@ The platform represents curriculum content as a graph of concepts and typed rela
 - Django 5.2 on Python 3.12.
 - PostgreSQL connection through provider-neutral `DATABASE_URL`.
 - Compatibility settings for PostgreSQL poolers.
-- Django admin and built-in authentication foundation.
+- Built-in Django authentication foundation; Django admin disabled by default (local-only opt-in).
 - JSON discovery endpoint at `/`.
 - JSON health endpoint at `/health/`.
 - Versioned read endpoints for concepts, relations, relation types, neighbourhoods and prerequisite traversal.
@@ -45,7 +45,7 @@ The platform represents curriculum content as a graph of concepts and typed rela
 |---|---|---|
 | `GET` | `/` | API discovery metadata |
 | `GET` | `/health/` | Service readiness and smoke-check response |
-| varies | `/admin/` | Django administrative interface |
+| varies | `/admin/` | Disabled by default; local opt-in only (`DJANGO_ADMIN_ENABLED=true`, non-production) |
 | `GET` | `/v1/concepts/` | List concepts |
 | `GET` | `/v1/concepts/<slug>/` | Read a concept |
 | `GET` | `/v1/concepts/<slug>/neighborhood/` | Read incoming/outgoing graph neighbourhood |
@@ -74,6 +74,8 @@ Example health response:
   "service": "curricula.live api"
 }
 ```
+
+**Security:** Django's built-in `/admin/` routes are intentionally not exposed by default. For isolated local development only, set `DJANGO_ADMIN_ENABLED=true` with `APP_ENV=development`. Production (`APP_ENV=production`) forces these routes off even if the flag is set. This does not disable `/v1/admin/auth/`, which serves the separate owner BFF. Existing weak Django superuser credentials must still be revoked or rotated in the database; disabling the route is not credential rotation.
 
 The dedicated `api.curricula.live` hostname makes a second `/api/` namespace redundant. Stable public consumers select an explicit major version such as `/v1/`; bare paths such as `/concepts/` are not floating aliases. A future `/v2/` should be introduced only for genuinely breaking contract changes.
 
