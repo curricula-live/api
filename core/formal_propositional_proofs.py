@@ -155,6 +155,7 @@ _RULE_FIELDS: dict[str, set[str]] = {
     "or_intro_right": {"premise", "other"},
     "iff_elim_left": {"equivalence"},
     "iff_elim_right": {"equivalence"},
+    "iff_intro": {"left", "right"},
 }
 
 
@@ -263,6 +264,27 @@ def verify_propositional_proof(proof: dict) -> dict:
                 raise PropositionalProofError(f"{identifier}: cannot eliminate non-conjunction")
             field = "left" if rule.endswith("left") else "right"
             result = VerifiedStep(premise.formula[field], premise.assumptions, rule)
+
+        elif rule == "iff_intro":
+            forward = earlier(step["left"], source=identifier)
+            backward = earlier(step["right"], source=identifier)
+            parents = [step["left"], step["right"]]
+            if (
+                forward.formula["op"] != "implies"
+                or backward.formula["op"] != "implies"
+                or forward.formula["left"] != backward.formula["right"]
+                or forward.formula["right"] != backward.formula["left"]
+            ):
+                raise PropositionalProofError(
+                    f"{identifier}: iff introduction requires two opposite implications"
+                )
+            result = VerifiedStep(
+                {"op": "iff",
+                 "left": forward.formula["left"],
+                 "right": forward.formula["right"]},
+                forward.assumptions | backward.assumptions,
+                rule,
+            )
 
         elif rule == "imp_elim":
             implication = earlier(step["implication"], source=identifier)
