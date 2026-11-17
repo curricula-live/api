@@ -489,3 +489,11 @@ for the verified canonical snapshot is available: the current models expose
 slugs only. No actual scholarly release has been installed. SQLite tests exercise
 synthetic fixtures only. PostgreSQL migration verification remains outstanding.
 The public HTTP surface is read-only; the installer is a local management command.
+
+### Provisional source relationship discovery
+
+When explicitly enabled in development, `/v2-preview/source-search/`,
+`/v2-preview/source-relations/` and `/v2-preview/source-predicates/` query
+separately staged `knowledge_source` records. They never approve scientific
+assertions or expand the trusted inference rules. See
+[docs/SOURCE_DISCOVERY_PREVIEW.md](docs/SOURCE_DISCOVERY_PREVIEW.md).
