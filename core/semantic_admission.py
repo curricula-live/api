@@ -9,6 +9,7 @@ from django.conf import settings
 from django.db import connection,ProgrammingError,OperationalError
 from django.http import Http404,JsonResponse
 from django.views.decorators.http import require_GET
+from core.predicate_logical_projection import project_concept_admissions
 
 def guard():
     if settings.IS_PRODUCTION or not getattr(settings,"V2_READ_PREVIEW_ENABLED",False):
@@ -55,11 +56,14 @@ def concept_admissions(request,concept_id):
         statements.append({
             "statement_id":str(sid),
             "subject_concept_id":str(subject),
+            "subject_label":attestation.get("subject_label"),
+            "object_label":attestation.get("object_label"),
             "predicate":predicate,
             "object_concept_id":str(obj),
             "direction":"outgoing" if subject==concept_id else "incoming",
             "predicate_policy":{
                 "semantics":policy["semantics"],
+                "logical_translation":policy.get("logical_translation"),
                 "semantic_scope":policy["semantic_scope"],
                 "transitive":False,"subtype_inference_eligible":False,
                 "prerequisite_inference_eligible":False,
@@ -83,6 +87,7 @@ def concept_admissions(request,concept_id):
             "proof_eligible":False,
         })
     return JsonResponse({
+        "logical_projection":project_concept_admissions(str(concept_id),statements),
         "contract_version":"semantic-admission-preview@1",
         "public_release_verified":False,
         "concept":{"id":str(concept[0]),"slug":concept[1],"label":concept[2]},

@@ -44,3 +44,12 @@ Verified against **real PostgreSQL** and the full Django request stack
 with the Artificial Intelligence concept: 6 direct admitted relations
 returned, all proof/inference flags false; five predicate policies
 returned.
+
+
+## Logical projection of actual admission rows
+
+Each concept admission response now includes `logical_projection`. Policies carrying the data-owned reviewed `logical_translation` contract can be translated to scoped binary atoms. Other statements remain unprojected. The projection never interprets absent edges as negation, topic hierarchy as class subsumption, or value membership as subtyping.
+
+The initial conditional rules are conjunction introduction and witnessed existential introduction. Every conclusion retains its exact canonical `premise_ids`; the rule checker recomputes its expression from those premises before returning it. Projections are conditional on the retrieved assertions, do not change their inference/proof trust flags and are never written back as canonical facts. Groups preserve predicate, semantic scope and relation direction. A bounded group is never presented as an exhaustive list of all possible relationships.
+
+This is a real database path, not a bundled demonstration: the same API query produces different concept-specific conclusions when its rows change. Verified with Stack ADT, Queue ADT, Boolean type and Artificial intelligence against a disposable PostgreSQL publication.
