@@ -184,3 +184,25 @@ def test_bounded_graph_reports_truncation(client, curriculum_graph):
     assert all(edge["source"] in {n["slug"] for n in page["graph"]["nodes"]}
                and edge["target"] in {n["slug"] for n in page["graph"]["nodes"]}
                for edge in page["graph"]["edges"])
+
+
+@pytest.mark.parametrize("predicate, target, expected", [
+    ("research_topic_parent_of", "machine-learning", "Array includes machine learning as a narrower research topic."),
+    ("adt_supports_operation", "enqueue", "Array supports the enqueue operation."),
+    ("adt_has_discipline", "fifo", "Array follows the FIFO ordering discipline."),
+    ("logic_gate_implements_operation", "and", "Array implements the Boolean AND operation."),
+    ("value_of_type", "boolean", "Array is a value of the boolean type."),
+])
+def test_admitted_predicates_render_without_subtype_promotion(
+    client, curriculum_graph, predicate, target, expected
+):
+    # Deliberately synthetic labels: the renderer must only express the input
+    # edge, never supply remembered subject-specific scientific properties.
+    edge = _add(curriculum_graph, "array", predicate, target)
+    _add(curriculum_graph, target, "subtype_of", "synthetic-category")
+    page = client.get(_url() + "?depth=3").json()
+    rendered = next(e for e in page["asserted_statements"] if e["id"] == str(edge.id))
+    assert rendered["text"] == expected
+    assert rendered["predicate"] == predicate
+    assert all(d["target"] != "synthetic-category" for d in page["derived_statements"])
+    assert str(edge.id) not in page["characterization"]["assertion_ids"]

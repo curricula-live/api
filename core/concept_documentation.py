@@ -43,6 +43,20 @@ def _sentence(subject: str, predicate: str, target: str) -> str:
         return f"{left} uses {right}."
     if predicate == "prerequisite_of":
         return f"{left} is a recorded prerequisite of {right}."
+    # Render the admitted vocabulary without upgrading its logical force.
+    # In particular, topic organization is not class subsumption.
+    if predicate == "research_topic_parent_of":
+        return f"{left} includes {right} as a narrower research topic."
+    if predicate == "adt_supports_operation":
+        return f"{left} supports the {right} operation."
+    if predicate == "adt_has_discipline":
+        discipline = right.upper() if target in {"fifo", "lifo"} else right
+        return f"{left} follows the {discipline} ordering discipline."
+    if predicate == "logic_gate_implements_operation":
+        operation = right.upper() if target in {"and", "or", "not", "xor", "nand", "nor", "xnor"} else right
+        return f"{left} implements the Boolean {operation} operation."
+    if predicate == "value_of_type":
+        return f"{left} is a value of the {right} type."
     return f"{left} —{predicate}→ {_name(target)}."
 
 
