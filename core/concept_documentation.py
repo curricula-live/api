@@ -12,6 +12,7 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_GET
 
 from core.models import Concept, Relation
+from core.concept_documentation_proofs import checked_subtype_trace
 
 DEFAULT_DEPTH = 2
 MAX_DEPTH = 5
@@ -159,6 +160,7 @@ def _derive_subtypes(slug: str, edges: list[dict], depth: int) -> list[dict]:
                     "text": _sentence(slug, "subtype_of", target),
                     "rule": RULE,
                     "premise_ids": list(next_ids),
+                    "proof": checked_subtype_trace(slug, target, list(next_ids), edges),
                     "status": "conditional_provisional_inference",
                 })
     return conclusions
