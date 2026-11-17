@@ -13,6 +13,7 @@ from django.views.decorators.http import require_GET
 
 from core.models import Concept, Relation
 from core.concept_documentation_proofs import checked_subtype_trace
+from core.concept_formal_expressions import direct_class_conditions, transitivity_formula
 
 DEFAULT_DEPTH = 2
 MAX_DEPTH = 5
@@ -163,6 +164,8 @@ def _derive_subtypes(slug: str, edges: list[dict], depth: int) -> list[dict]:
                     "proof": checked_subtype_trace(slug, target, list(next_ids), edges),
                     "status": "conditional_provisional_inference",
                 })
+    for derived in conclusions:
+        derived["formal_rule"] = transitivity_formula(derived)
     return conclusions
 
 
@@ -241,6 +244,7 @@ def build_documentation(slug: str, depth: int) -> dict:
             "edges": edges,
         },
         "characterization": characterization,
+        "class_conditions": direct_class_conditions(slug, edges),
         "asserted_statements": edges,
         "derived_statements": _derive_subtypes(slug, edges, depth),
         "derivation_policy": {
