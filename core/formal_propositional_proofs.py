@@ -1,12 +1,9 @@
-"""Strict synthetic propositional proof checker; no canonical data or HTTP.
+"""Strict symbolic propositional proof checker with explicit assumption contexts.
 
-This verifies natural-deduction steps and tracks undischarged assumptions.
-It does NOT establish the scientific truth of atoms, authenticate ontology
-statements, or make any proof available to the public website.
-
-Rules: assume, and_intro, and_elim_left/right, imp_elim, imp_intro,
-or_intro_left/right, iff_elim_left/right. Negation and bottom/top are
-supported by checked introduction/elimination rules, including proof by cases.
+Rules cover conjunction, disjunction, implication, biconditional, negation and
+contradiction. Only synthetic schematic certificates are accepted. Closed
+schemas may be displayed in clearly labelled reasoning previews; checking them
+does not authorize canonical publication or certify an external scientific claim.
 """
 from __future__ import annotations
 

@@ -144,9 +144,22 @@ def build_logical_reasoning():
                    "implies": binary("implies", P, Q), "iff": binary("iff", P, Q)}
     table = [{"p": p, "q": q, **{name: _evaluate(formula, {"P": p, "Q": q})
               for name, formula in expressions.items()}} for p, q in product((False, True), repeat=2)]
-    return {"contract_version": "logical-reasoning-preview@1", "scope": "Boolean propositional logic",
+    all_ids = [example["id"] for example in examples]
+    concept_examples = {slug: all_ids for slug in ("boolean", "boolean-data", "logic", "truth-value", "statement", "condition")}
+    for slug, operator in {"and": "and", "or": "or", "not": "not", "implication": "implies", "equivalence": "iff"}.items():
+        concept_examples[slug] = [example["id"] for example in examples if operator in example["operators"]]
+    return {"concept_examples": concept_examples,
+            "contract_version": "logical-reasoning-preview@1", "scope": "Boolean propositional logic",
             "atom_meaning": "P and Q stand for arbitrary propositions, not recorded concept properties.",
             "canonical_knowledge_changed": False, "examples": examples, "truth_table": table}
+
+
+def logical_reasoning_for_concept(slug):
+    bundle = build_logical_reasoning()
+    identifiers = bundle["concept_examples"].get(slug)
+    if identifiers is None:
+        return None
+    return {**bundle, "examples": [e for e in bundle["examples"] if e["id"] in identifiers]}
 
 
 if __name__ == "__main__":
