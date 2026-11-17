@@ -1,6 +1,7 @@
 from django.urls import path
 
 from core.concept_documentation import concept_documentation
+from core.logical_reasoning_views import concept_logical_reasoning
 from core.owner_auth_views import verify_owner_session
 from core.owner_auth_http import request_owner_link, redeem_owner_link, logout_owner_session
 
@@ -22,6 +23,7 @@ urlpatterns = [
     path("admin/auth/logout/", logout_owner_session, name="owner-auth-logout"),
     path("search/", search, name="search"),
     path("concepts/", concept_list, name="concept-list"),
+    path("concepts/<str:slug>/logical-reasoning/", concept_logical_reasoning, name="concept-logical-reasoning"),
     path("concepts/<str:slug>/", concept_detail, name="concept-detail"),
     path(
         "concepts/<str:slug>/neighborhood/",
