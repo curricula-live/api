@@ -6,7 +6,7 @@ statements, or make any proof available to the public website.
 
 Rules: assume, and_intro, and_elim_left/right, imp_elim, imp_intro,
 or_intro_left/right, iff_elim_left/right. Negation and bottom/top are
-supported as formula SYNTAX but have no introduction/elimination rules yet.
+supported by checked introduction/elimination rules, including proof by cases.
 """
 from __future__ import annotations
 
@@ -156,6 +156,10 @@ _RULE_FIELDS: dict[str, set[str]] = {
     "iff_elim_left": {"equivalence"},
     "iff_elim_right": {"equivalence"},
     "iff_intro": {"left", "right"},
+    "or_elim": {"disjunction", "left_case", "right_case"},
+    "not_intro": {"assumption", "conclusion"},
+    "not_elim": {"positive", "negative"},
+    "bottom_elim": {"contradiction", "formula"},
 }
 
 
@@ -265,6 +269,46 @@ def verify_propositional_proof(proof: dict) -> dict:
             field = "left" if rule.endswith("left") else "right"
             result = VerifiedStep(premise.formula[field], premise.assumptions, rule)
 
+        elif rule == "or_elim":
+            disjunction = earlier(step["disjunction"], source=identifier)
+            left_case = earlier(step["left_case"], source=identifier)
+            right_case = earlier(step["right_case"], source=identifier)
+            parents = [step["disjunction"], step["left_case"], step["right_case"]]
+            if (disjunction.formula["op"] != "or"
+                    or left_case.formula["op"] != "implies"
+                    or right_case.formula["op"] != "implies"
+                    or left_case.formula["left"] != disjunction.formula["left"]
+                    or right_case.formula["left"] != disjunction.formula["right"]
+                    or left_case.formula["right"] != right_case.formula["right"]):
+                raise PropositionalProofError(f"{identifier}: cases require both alternatives and the same conclusion")
+            result = VerifiedStep(left_case.formula["right"],
+                disjunction.assumptions | left_case.assumptions | right_case.assumptions, rule)
+
+        elif rule == "not_elim":
+            positive = earlier(step["positive"], source=identifier)
+            negative = earlier(step["negative"], source=identifier)
+            parents = [step["positive"], step["negative"]]
+            if negative.formula != {"op": "not", "arg": positive.formula}:
+                raise PropositionalProofError(f"{identifier}: contradiction requires a proposition and its negation")
+            result = VerifiedStep({"op": "bottom"}, positive.assumptions | negative.assumptions, rule)
+
+        elif rule == "not_intro":
+            assumption = earlier(step["assumption"], source=identifier)
+            conclusion = earlier(step["conclusion"], source=identifier)
+            parents = [step["assumption"], step["conclusion"]]
+            if assumption.rule != "assume" or conclusion.formula != {"op": "bottom"}:
+                raise PropositionalProofError(f"{identifier}: negation introduction requires an assumption and contradiction")
+            result = VerifiedStep({"op": "not", "arg": assumption.formula},
+                conclusion.assumptions - {step["assumption"]}, rule)
+
+        elif rule == "bottom_elim":
+            contradiction = earlier(step["contradiction"], source=identifier)
+            parents = [step["contradiction"]]
+            _check_formula(step["formula"], context=identifier)
+            if contradiction.formula != {"op": "bottom"}:
+                raise PropositionalProofError(f"{identifier}: explosion requires an explicit contradiction")
+            result = VerifiedStep(step["formula"], contradiction.assumptions, rule)
+
         elif rule == "iff_intro":
             forward = earlier(step["left"], source=identifier)
             backward = earlier(step["right"], source=identifier)
@@ -343,7 +387,7 @@ def verify_propositional_proof(proof: dict) -> dict:
             **render_formula(result.formula),
             "premise_step_ids": parents,
             "open_assumption_step_ids": sorted(result.assumptions),
-            "discharged_assumption_step_id": step["assumption"] if rule == "imp_intro" else None,
+            "discharged_assumption_step_id": step["assumption"] if rule in ("imp_intro", "not_intro") else None,
         })
 
     if declared_goal not in checked:

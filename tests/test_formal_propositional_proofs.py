@@ -96,7 +96,7 @@ def test_or_introduction_does_not_permit_or_elimination():
     assert result["steps"][1]["unicode"] == "P ∨ Q"
     assert result["open_assumption_step_ids"] == ["h1"]
     data["steps"].append({"id": "s2", "rule": "or_elim", "premise": "s1"})
-    with pytest.raises(PropositionalProofError, match="Unknown proof rule"):
+    with pytest.raises(PropositionalProofError, match="expected exactly"):
         verify_propositional_proof(data)
 
 
