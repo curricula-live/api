@@ -497,3 +497,10 @@ When explicitly enabled in development, `/v2-preview/source-search/`,
 separately staged `knowledge_source` records. They never approve scientific
 assertions or expand the trusted inference rules. See
 [docs/SOURCE_DISCOVERY_PREVIEW.md](docs/SOURCE_DISCOVERY_PREVIEW.md).
+
+### Editorially admitted statement evidence (development preview)
+
+`/v2-preview/concepts/<uuid>/admissions/` and
+`/v2-preview/predicate-semantic-policies/` expose source-backed editorial
+admission evidence. No formal proof, subtype or prerequisite inference is
+asserted. See [the semantic admission preview](docs/SEMANTIC_ADMISSION_PREVIEW.md).
