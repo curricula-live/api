@@ -39,6 +39,12 @@ def test_documentation_uses_existing_graph_not_fixture_definitions(client, curri
     assert page["characterization"]["text"] == "Array is a data structure."
     assert len(page["characterization"]["assertion_ids"]) == 1
     assert len(page["asserted_statements"]) == 3
+    assert page["relation_profile"]["direct_recorded_relations"] == sum(
+        1 for edge in page["asserted_statements"]
+        if edge["source"] == "array" or edge["target"] == "array"
+    )
+    assert page["relation_profile"]["scope"] == "retrieved_neighborhood_only"
+    assert page["relation_profile"]["scientific_completeness_established"] is False
     assert page["derived_statements"] == []
     assert response["Cache-Control"] == "no-store"
 

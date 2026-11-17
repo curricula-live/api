@@ -14,6 +14,7 @@ from django.views.decorators.http import require_GET
 from core.models import Concept, Relation
 from core.concept_documentation_proofs import checked_subtype_trace
 from core.concept_formal_expressions import direct_class_conditions, transitivity_formula
+from core.concept_relation_profile import build_relation_profile
 
 DEFAULT_DEPTH = 2
 MAX_DEPTH = 5
@@ -219,6 +220,7 @@ def build_documentation(slug: str, depth: int) -> dict:
             "method": "direct_conjunctive_assertions",
         }
 
+    derived = _derive_subtypes(slug, edges, depth)
     return {
         "contract_version": "legacy-concept-documentation@1",
         "concept": {"slug": slug, "label": _name(slug)},
@@ -246,7 +248,8 @@ def build_documentation(slug: str, depth: int) -> dict:
         "characterization": characterization,
         "class_conditions": direct_class_conditions(slug, edges),
         "asserted_statements": edges,
-        "derived_statements": _derive_subtypes(slug, edges, depth),
+        "derived_statements": derived,
+        "relation_profile": build_relation_profile(slug, edges, derived, truncated=truncated),
         "derivation_policy": {
             "implemented_rules": [RULE],
             "rule_description": "If A subtype_of B and B subtype_of C, infer A subtype_of C.",
