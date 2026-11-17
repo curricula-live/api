@@ -10,7 +10,10 @@ SID=UUID("33333333-3333-4333-8333-333333333333")
 CONCEPT_ROUTE=reverse("v2-preview-concept-admissions",kwargs={"concept_id":CID})
 POLICY_ROUTE=reverse("v2-preview-predicate-semantic-policies")
 RECORD={"source_id":"cso@3.5","native_predicate":"http://cso.kmi.open.ac.uk/schema/cso#superTopicOf",
- "source_assertion_witness":"sha256:abc","evidence_urls":["https://cso.kmi.open.ac.uk/about"],
+ "source_assertion_witness":"sha256:abc","source_archive_sha256":"0"*64,
+ "review_method":"explicit_editorial_allowlist_with_exact_source_witness",
+ "scope_note":"Direct source-reported topic relation only",
+ "evidence_urls":["https://cso.kmi.open.ac.uk/about"],
  "review_level":"editorially_screened_source_attested",
  "subject_source_uri":"https://cso.kmi.open.ac.uk/topics/artificial_intelligence",
  "object_source_uri":"https://cso.kmi.open.ac.uk/topics/machine_learning"}
@@ -50,6 +53,8 @@ def test_concept_admissions_have_witness_and_semantic_policy(client):
     assert s["statement_id"]==str(SID)
     assert s["direction"]=="outgoing"
     assert s["evidence"]["original_predicate"].endswith("superTopicOf")
+    assert s["evidence"]["source_archive_sha256"]=="0"*64
+    assert s["evidence"]["scope_note"].startswith("Direct source")
     assert s["evidence"]["references"]==["https://cso.kmi.open.ac.uk/about"]
     assert s["predicate_policy"]["subtype_inference_eligible"] is False
     assert s["predicate_policy"]["prerequisite_inference_eligible"] is False

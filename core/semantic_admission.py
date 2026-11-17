@@ -1,6 +1,6 @@
 """Development-only evidence for source-admitted canonical statements.
 
-The publisher-signed source witness is an editorial attestation of a direct
+The hashed source witness accompanies an editorial attestation of a direct
 relation, never a theorem, inference premise, synonym assertion or prerequisite.
 """
 import json
@@ -69,8 +69,11 @@ def concept_admissions(request,concept_id):
                 "source_id":attestation["source_id"],
                 "original_predicate":attestation["native_predicate"],
                 "original_source_assertion":attestation["source_assertion_witness"],
+                "source_archive_sha256":attestation.get("source_archive_sha256"),
                 "references":attestation["evidence_urls"],
                 "review_level":attestation["review_level"],
+                "review_method":attestation.get("review_method"),
+                "scope_note":attestation.get("scope_note"),
                 "independent_expert_review":False,
                 "source_subject_uri":attestation["subject_source_uri"],
                 "source_object_uri":attestation["object_source_uri"],

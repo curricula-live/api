@@ -9,7 +9,7 @@ much larger unreviewed source graph.
 
 - `GET /v2-preview/concepts/{uuid}/admissions/?limit=30&offset=0`
   returns newly admitted statements connected to the canonical concept,
-  their original source assertion witnesses, original predicate,
+  their original source assertion witnesses, source archive checksums, original predicate,
   supporting external references, direct/incoming direction, editorial
   review level, and exact predicate semantic scope.
 - `GET /v2-preview/predicate-semantic-policies/`
