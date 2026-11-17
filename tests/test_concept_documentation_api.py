@@ -71,6 +71,20 @@ def test_three_hop_path_witness_is_ordered_and_no_phantom_direct_edges(client, c
     page = client.get(_url() + "?depth=3").json()
     conclusion = next(d for d in page["derived_statements"] if d["target"] == "container")
     assert conclusion["premise_ids"] == [str(first.id), str(second.id), str(third.id)]
+    proof = conclusion["proof"]
+    assert proof["format"] == "provisional-subtype-trace@1"
+    assert proof["scope_origin"] == "assumed_not_in_source"
+    assert proof["source_semantics_verified"] is False
+    assert proof["is_formal_proof_certificate"] is False
+    assert proof["may_publish"] is False
+    assert [step["id"] for step in proof["steps"]] == ["h1", "h2", "h3", "s1", "s2"]
+    assert [step["assertion_id"] for step in proof["steps"][:3]] == [
+        str(first.id), str(second.id), str(third.id)
+    ]
+    assert proof["steps"][3]["depends_on"] == ["h1", "h2"]
+    assert proof["steps"][4]["depends_on"] == ["s1", "h3"]
+    assert proof["steps"][4]["target"] == "container"
+    assert proof["conclusion_step_id"] == "s2"
     assert not any(edge["source"] == "array" and edge["target"] == "container"
                    for edge in page["asserted_statements"])
 
