@@ -7,6 +7,7 @@ from django.db import connection, OperationalError, ProgrammingError
 from django.http import Http404, JsonResponse
 from django.views.decorators.http import require_GET
 from core.concept_documentation import _derive_subtypes
+from core.concept_characterization import build_characterization
 from core.concept_formal_expressions import direct_class_conditions
 from core.concept_relation_profile import build_relation_profile
 from core.predicate_logical_projection import project_concept_admissions
@@ -171,16 +172,7 @@ def documentation(request,slug):
         derived=_derive_subtypes(slug,canonical,depth)
         labels={n['slug']:n['label'] for n in nodes}
         for d in derived:d['text']=text(labels.get(slug,slug),'subtype_of',labels.get(d['target'],d['target']))
-        direct=[e for e in canonical if e['source']==slug]
-        parts=[]; supporting=[]
-        # Mechanical conjunction of actual recorded predicates; no iff claim.
-        for predicate in ('subtype_of','adt_supports_operation','adt_has_discipline','logic_gate_implements_operation','value_of_type','uses','processes','produces','research_topic_parent_of'):
-            group=[e for e in direct if e['predicate']==predicate][:6]
-            if not group:continue
-            targets=[labels.get(e['target'],e['target']) for e in group]
-            joined=targets[0] if len(targets)==1 else ', '.join(targets[:-1])+' and '+targets[-1]
-            parts.append(text(root[2] if not parts else 'It',predicate,joined))
-            supporting.extend(e['id'] for e in group)
+        characterization=build_characterization(slug,root[2],labels,canonical,derived,truncated=truncated)
         projection=admitted_projection(cursor,root)
         available={e['id'] for e in edges}
         scoped=[c for c in projection['conclusions'] if set(c['premise_ids'])<=available]
@@ -190,7 +182,7 @@ def documentation(request,slug):
                     'description':'Database-backed development corpus with scoped source records and conditional inference.'},
           'traversal':{'depth':depth,'max_depth':5,'max_nodes':MAX_NODES,'max_edges':MAX_EDGES,'truncated':truncated},
           'graph':{'nodes':nodes,'edges':edges},
-          'characterization':{'text':' '.join(parts),'assertion_ids':supporting,'status':STATUS,'method':'direct_conjunctive_assertions'} if parts else None,
+          'characterization':characterization,
           'class_conditions':direct_class_conditions(slug,canonical),'asserted_statements':edges,
           'derived_statements':derived,'scoped_derivations':scoped,
           'relation_profile':build_relation_profile(slug,edges,derived,truncated=truncated),
