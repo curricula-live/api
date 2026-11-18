@@ -13,7 +13,8 @@ from core.concept_relation_profile import build_relation_profile
 from core.predicate_logical_projection import project_concept_admissions
 
 STATUS = 'provisional_knowledge_v2'
-MAX_NODES, MAX_EDGES = 120, 240
+REASONING_DEPTH = 5
+MAX_NODES, MAX_EDGES = 360, 1000
 
 
 def guard():
@@ -99,50 +100,69 @@ def detail(request,slug):
     return respond(read)
 
 
-def read_neighborhood(cursor,root,depth):
+def _read_neighborhood(cursor,root,depth, *, source_only=False, targeted=False, max_nodes=MAX_NODES, max_edges=MAX_EDGES):
     nodes={str(root[0]):{'id':str(root[0]),'slug':root[1],'label':root[2],'hop':0}}
     frontier=[root[0]]; edges={}; truncated=False
     for hop in range(1,depth+1):
-        if not frontier or len(edges)>=MAX_EDGES:break
-        cursor.execute('''select s.id,a.id,a.slug,a.label,s.predicate_slug,b.id,b.slug,b.label
-          from knowledge.statement s join knowledge.concept a on a.id=s.subject_concept_id
-          join knowledge.concept b on b.id=s.object_concept_id
-          where a.id=any(%s::uuid[]) or b.id=any(%s::uuid[])
-          order by case when s.predicate_slug='subtype_of' then 0 else 1 end,s.id limit 241''',[frontier,frontier])
-        rows=[(str(i),a,sa,la,p,b,sb,lb,False,None) for i,a,sa,la,p,b,sb,lb in cursor.fetchall()]
+        if not frontier or len(edges)>=max_edges:break
+        rows=[]
+        if not source_only:
+            cursor.execute('''select s.id,a.id,a.slug,a.label,s.predicate_slug,b.id,b.slug,b.label
+              from knowledge.statement s join knowledge.concept a on a.id=s.subject_concept_id
+              join knowledge.concept b on b.id=s.object_concept_id
+              where (a.id=any(%s::uuid[]) or b.id=any(%s::uuid[]))
+                and (not %s or (s.predicate_slug='subtype_of' and a.id=any(%s::uuid[])))
+              order by case when s.predicate_slug='subtype_of' then 0 else 1 end,s.id limit %s''',[frontier,frontier,targeted and hop > 1,frontier,max_edges+1])
+            rows=[(str(i),a,sa,la,p,b,sb,lb,False,None) for i,a,sa,la,p,b,sb,lb in cursor.fetchall()]
         # Native historical topic edges are shown as source records only. They
         # never enter canonical subtype or admitted-predicate inference.
-        cursor.execute('''select r.source_assertion_witness,a.id,a.slug,a.label,r.native_predicate,b.id,b.slug,b.label
-          from knowledge_source.assertion r
-          join knowledge.concept a on a.id=r.subject_candidate_ids[1]
-          join knowledge.concept b on b.id=r.object_candidate_ids[1]
-          where r.source_id='curricula-historical-v1@1.0.0'
-            and cardinality(r.subject_candidate_ids)=1 and cardinality(r.object_candidate_ids)=1
-            and r.native_predicate in ('broaderTopic','subtopicOf')
-            and (a.id=any(%s::uuid[]) or b.id=any(%s::uuid[]))
-          order by r.source_assertion_witness limit 241''',[frontier,frontier])
-        for witness,a,sa,la,p,b,sb,lb in cursor.fetchall():
-            rows.append((str(uuid.uuid5(uuid.NAMESPACE_URL,'curricula-source-witness:'+witness)),a,sa,la,
-                         'source_broader_topic' if p=='broaderTopic' else 'source_subtopic_of',b,sb,lb,True,witness))
-        if len(rows)>MAX_EDGES:truncated=True
+        if source_only:
+            cursor.execute('''select r.source_assertion_witness,a.id,a.slug,a.label,r.native_predicate,b.id,b.slug,b.label
+              from knowledge_source.assertion r
+              join knowledge.concept a on a.id=r.subject_candidate_ids[1]
+              join knowledge.concept b on b.id=r.object_candidate_ids[1]
+              where r.source_id='curricula-historical-v1@1.0.0'
+                and cardinality(r.subject_candidate_ids)=1 and cardinality(r.object_candidate_ids)=1
+                and r.native_predicate in ('broaderTopic','subtopicOf')
+                and (a.id=any(%s::uuid[]) or b.id=any(%s::uuid[]))
+              order by r.source_assertion_witness limit %s''',[frontier,frontier,max_edges+1])
+            for witness,a,sa,la,p,b,sb,lb in cursor.fetchall():
+                rows.append((str(uuid.uuid5(uuid.NAMESPACE_URL,'curricula-source-witness:'+witness)),a,sa,la,
+                             'source_broader_topic' if p=='broaderTopic' else 'source_subtopic_of',b,sb,lb,True,witness))
+        if len(rows)>max_edges:truncated=True
         next_frontier=[]
-        for sid,a,sa,la,p,b,sb,lb,source_only,witness in rows:
+        for sid,a,sa,la,p,b,sb,lb,is_source_record,witness in rows:
             if sid in edges:continue
-            if len(edges)>=MAX_EDGES:truncated=True;break
-            if any(str(i) not in nodes for i in (a,b)) and len(nodes)>=MAX_NODES:
+            if len(edges)>=max_edges:truncated=True;break
+            if any(str(i) not in nodes for i in (a,b)) and len(nodes)>=max_nodes:
                 truncated=True;continue
             for i,s,l in ((a,sa,la),(b,sb,lb)):
                 key=str(i)
                 if key not in nodes:
-                    if len(nodes)>=MAX_NODES:truncated=True;break
+                    if len(nodes)>=max_nodes:truncated=True;break
                     nodes[key]={'id':key,'slug':s,'label':l,'hop':hop};next_frontier.append(i)
             if str(a) not in nodes or str(b) not in nodes:continue
             edges[sid]={'id':sid,'source':sa,'predicate':p,'target':sb,'text':text(la,p,lb),
                 'hop':max(nodes[str(a)]['hop'],nodes[str(b)]['hop']),
-                'status':'source_recorded_not_canonical' if source_only else STATUS,
-                'source_assertion_witness':witness,'source_only':source_only}
+                'status':'source_recorded_not_canonical' if is_source_record else STATUS,
+                'source_assertion_witness':witness,'source_only':is_source_record}
         frontier=next_frontier
     return list(nodes.values()), sorted(edges.values(),key=lambda e:(e['hop'],e['source'],e['predicate'],e['target'],e['id'])), truncated
+
+
+def read_neighborhood(cursor,root,depth):
+    # Reserve the reasoning budget for canonical premises and outward subtype
+    # chains before collecting broad canonical/source neighborhood context.
+    reasoning=_read_neighborhood(cursor,root,depth,targeted=True)
+    context=_read_neighborhood(cursor,root,depth,max_nodes=120,max_edges=240)
+    source=_read_neighborhood(cursor,root,depth,source_only=True,max_nodes=120,max_edges=240)
+    nodes={}; edges={}
+    for ns,es,_ in (reasoning,context,source):
+        for n in ns:
+            old=nodes.get(n['id'])
+            if old is None or n['hop'] < old['hop']:nodes[n['id']]=n
+        for e in es:edges.setdefault(e['id'],e)
+    return list(nodes.values()),sorted(edges.values(),key=lambda e:(e['hop'],e['source'],e['predicate'],e['target'],e['id'])),any(t for _,_,t in (reasoning,context,source))
 
 
 def admitted_projection(cursor,root):
@@ -162,9 +182,8 @@ def admitted_projection(cursor,root):
 
 @require_GET
 def documentation(request,slug):
-    try:depth=int(request.GET.get('depth','2'))
-    except ValueError:return JsonResponse({'error':'invalid depth'},status=400)
-    if not 1<=depth<=5:return JsonResponse({'error':'invalid depth'},status=400)
+    # Depth query parameters cannot change the reasoning scope.
+    depth=REASONING_DEPTH
     def read(cursor):
         root=concept_row(cursor,slug)
         nodes,edges,truncated=read_neighborhood(cursor,root,depth)
@@ -180,7 +199,7 @@ def documentation(request,slug):
           'contract_version':'legacy-concept-documentation@1','concept':{'slug':slug,'label':root[2]},
           'source':{'kind':'canonical_staging_statements','status':STATUS,'is_published_v2':False,'is_peer_reviewed':False,
                     'description':'Database-backed development corpus with scoped source records and conditional inference.'},
-          'traversal':{'depth':depth,'max_depth':5,'max_nodes':MAX_NODES,'max_edges':MAX_EDGES,'truncated':truncated},
+          'traversal':{'depth':depth,'max_depth':5,'max_nodes':MAX_NODES+240,'max_edges':MAX_EDGES+480,'truncated':truncated,'reasoning_depth':REASONING_DEPTH,'retrieval_strategy':'canonical_rule_paths_before_neighborhood_context'},
           'graph':{'nodes':nodes,'edges':edges},
           'characterization':characterization,
           'class_conditions':direct_class_conditions(slug,canonical),'asserted_statements':edges,

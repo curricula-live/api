@@ -72,9 +72,15 @@ def test_preview_documentation_includes_incoming_only_characterization(monkeypat
     monkeypatch.setattr(staging_concepts, 'concept_row', lambda cursor, slug: ('pop-id', slug, 'Stack pop'))
     rows = [edge('supports', 'stack-adt', 'adt_supports_operation', 'stack-pop', source_only=False, hop=1)]
     nodes = [{'slug': 'stack-pop', 'label': 'Stack pop', 'hop': 0}, {'slug': 'stack-adt', 'label': 'Stack ADT', 'hop': 1}]
-    monkeypatch.setattr(staging_concepts, 'read_neighborhood', lambda *args: (nodes, rows, False))
+    depths = []
+    def read_neighborhood(cursor, root, depth):
+        depths.append(depth)
+        return nodes, rows, False
+    monkeypatch.setattr(staging_concepts, 'read_neighborhood', read_neighborhood)
     monkeypatch.setattr(staging_concepts, 'admitted_projection', lambda *args: {'conclusions': []})
-    response = staging_concepts.documentation(RequestFactory().get('/'), 'stack-pop')
+    response = staging_concepts.documentation(RequestFactory().get('/?depth=1'), 'stack-pop')
     result = json.loads(response.content)
     assert result['characterization']['text'] == 'Stack pop is an operation supported by Stack ADT.'
     assert result['characterization']['assertion_ids'] == ['supports']
+    assert depths == [5]
+    assert result['traversal']['reasoning_depth'] == 5
