@@ -50,7 +50,7 @@ def text(subject,predicate,obj):
       'logic_gate_implements_operation':'implements the Boolean operation',
       'value_of_type':'is a value of',
       'research_topic_parent_of':'has the directly recorded narrower research topic',
-      'source_broader_topic':'is recorded as a broader source topic than',
+      'source_broader_topic':'has the recorded broader source topic',
       'source_subtopic_of':'is recorded as a source subtopic of',
     }
     return f'{subject} {phrases.get(predicate,predicate.replace("_"," "))} {obj}.'
