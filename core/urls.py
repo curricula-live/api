@@ -1,5 +1,6 @@
 from django.urls import path
 
+from core.concept_documentation import concept_documentation
 from core.owner_auth_views import verify_owner_session
 from core.owner_auth_http import request_owner_link, redeem_owner_link, logout_owner_session
 
@@ -26,6 +27,11 @@ urlpatterns = [
         "concepts/<str:slug>/neighborhood/",
         concept_neighborhood,
         name="concept-neighborhood",
+    ),
+    path(
+        "concepts/<str:slug>/documentation/",
+        concept_documentation,
+        name="concept-documentation",
     ),
     path(
         "concepts/<str:slug>/prerequisites/",

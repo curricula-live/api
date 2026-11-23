@@ -61,8 +61,12 @@ def test_new_challenge_uses_owner_row_lock_and_stores_only_digest():
     assert issued is not None
     assert issued.expires_at == NOW + CHALLENGE_TTL
     assert len(cursor.statements) == 5
+    # Challenge issuance is serialized by an advisory transaction lock. The
+    # login database role can continue reading owner identity without UPDATE
+    # privileges, unlike the former FOR UPDATE query.
     assert "pg_advisory_xact_lock" in cursor.statements[0][0]
     assert cursor.statements[0][1] == ("owner-login-challenge:owner@example.org",)
+    assert "for update" not in cursor.statements[1][0].lower()
     assert cursor.statements[1][1] == ("owner@example.org",)
     assert cursor.statements[2][1] == (OWNER, NOW - ISSUE_COOLDOWN)
     assert cursor.statements[3][1][2] == fingerprint_token(issued.token, "challenge")
