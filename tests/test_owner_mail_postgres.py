@@ -220,7 +220,7 @@ def test_worker_discards_challenge_with_less_than_thirty_seconds_left():
 
 
 @override_settings(**CONFIG)
-def test_full_http_async_owner_login_uses_worker_not_request_thread(client):
+def test_full_http_async_owner_login_dispatches_worker_from_request(client):
     """Request -> PostgreSQL outbox -> mail worker -> redeem -> revoke."""
     import json
     from django.urls import reverse
@@ -234,7 +234,12 @@ def test_full_http_async_owner_login_uses_worker_not_request_thread(client):
         OWNER_BFF_SHARED_SECRET=machine_key,
         OWNER_RATE_LIMIT_KEY="independent-staging-quota-key-at-least-32-characters",
     ):
-        with patch("core.owner_auth_http.send_mail") as forbidden_inline:
+        # The production Vercel handler attempts bounded outbox delivery
+        # during the request, but mail still flows through the worker module.
+        with (
+            patch("core.owner_auth_http.send_mail") as forbidden_inline,
+            patch("core.owner_mail_worker.send_mail", return_value=1) as delivery,
+        ):
             request = client.post(
                 reverse("owner-auth-request"),
                 data=json.dumps({"email": email}),
@@ -249,8 +254,12 @@ def test_full_http_async_owner_login_uses_worker_not_request_thread(client):
             cursor.execute("select count(*) from admin.owner_email_outbox")
             assert cursor.fetchone()[0] == 1
 
-        with patch("core.owner_mail_worker.send_mail", return_value=1) as delivery:
-            assert dispatch_one() == "delivered"
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select attempts,delivered_at from admin.owner_email_outbox"
+            )
+            attempts, delivered_at = cursor.fetchone()
+        assert attempts == 1 and delivered_at is not None
         assert delivery.call_count == 1
         link = delivery.call_args.args[1]
         token = link.split("#challenge=", 1)[1].splitlines()[0]
