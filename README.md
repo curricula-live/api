@@ -49,6 +49,7 @@ The platform represents curriculum content as a graph of concepts and typed rela
 | `GET` | `/v1/concepts/` | List concepts |
 | `GET` | `/v1/concepts/<slug>/` | Read a concept |
 | `GET` | `/v1/concepts/<slug>/neighborhood/` | Read incoming/outgoing graph neighbourhood |
+| `GET` | `/v1/concepts/<slug>/documentation/?depth=2` | Experimental read-only graph statements and witnessed subtype derivations (depth 1–5) |
 | `GET` | `/v1/concepts/<slug>/prerequisites/` | Bounded prerequisite traversal |
 | `GET` | `/v1/relations/` | List/filter relations |
 | `GET` | `/v1/relations/<uuid>/` | Read a relation |

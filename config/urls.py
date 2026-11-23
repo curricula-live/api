@@ -5,6 +5,7 @@ from django.contrib import admin
 from django.urls import include, path
 
 from core.views import api_root, health
+from core import staging_concepts
 from core.staging_db_diagnostic import staging_database_health
 from core.atlas_preview import atlas_preview
 from core.atlas_neighborhood import concept_relationships_preview
@@ -16,6 +17,11 @@ urlpatterns = [
     path("health/", health, name="health"),
     path("internal/staging-db-health/", staging_database_health, name="staging-db-health"),
     path("v1/", include("core.urls")),
+    path("v2-preview/knowledge/search/", staging_concepts.search),
+    path("v2-preview/knowledge/concepts/", staging_concepts.directory),
+    path("v2-preview/knowledge/concepts/<slug:slug>/", staging_concepts.detail),
+    path("v2-preview/knowledge/concepts/<slug:slug>/documentation/", staging_concepts.documentation),
+    path("v2-preview/knowledge/concepts/<slug:slug>/neighborhood/", staging_concepts.neighborhood),
     path("v2/concepts/", public_concepts, name="v2-concepts"),
     path("v2/concepts/<uuid:concept_id>/", public_concept_detail, name="v2-concept-detail"),
     path("v2/concepts/<uuid:concept_id>/statements/", concept_statements, name="v2-concept-statements"),
